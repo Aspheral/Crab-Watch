@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { aggregateEngineResultsByGame, summarizeEngineBaseline, summarizeTemporalEngineBaseline, compareCurrentToBaseline } from '../src/analysis/baseline.js';
+import { aggregateEngineResultsByGame, summarizeEngineBaseline, summarizeTemporalEngineBaseline, compareCurrentToBaseline, BASELINE_GAMES, BASELINE_MAX_POSITIONS, BASELINE_MAX_POSITIONS_TOTAL } from '../src/analysis/baseline.js';
+
+test('keeps the historical engine baseline budget explicit', () => {
+  assert.equal(BASELINE_GAMES, 12);
+  assert.equal(BASELINE_MAX_POSITIONS, 2);
+  assert.equal(BASELINE_MAX_POSITIONS_TOTAL, 24);
+});
 
 test('summarizes engine baseline', () => {
   const result = summarizeEngineBaseline([
