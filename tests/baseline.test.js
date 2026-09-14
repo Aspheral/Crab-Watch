@@ -37,13 +37,13 @@ test('aggregates multiple engine positions into one game-level result', () => {
 
 test('excludes incomplete engine positions from baseline aggregation', () => {
   const games = aggregateEngineResultsByGame([
-    { gameKey: 'a', endTime: 10, centipawnLoss: 10, bestMoveMatches: true },
+    { gameKey: 'a', endTime: 10, centipawnLoss: 8, bestMoveMatches: true },
     { gameKey: 'a', endTime: 10, centipawnLoss: null, bestMoveMatches: true },
-    { gameKey: 'b', endTime: 9, bestMoveMatches: false }
+    { gameKey: 'a', endTime: 10, centipawnLoss: 12, bestMoveMatches: null }
   ]);
   assert.equal(games.length, 1);
-  assert.equal(games[0].gameKey, 'a');
   assert.equal(games[0].positionsScored, 1);
+  assert.equal(games[0].medianCpl, 8);
   assert.equal(games[0].topMoveMatchRate, 1);
 });
 
@@ -71,16 +71,16 @@ test('compares current game against personal baseline', () => {
 
 test('detects a temporal engine-quality shift across aggregated games', () => {
   const results = [
-    { gameKey: 'r1', endTime: 20, medianCpl: 6, topMoveMatchRate: 1 },
-    { gameKey: 'r2', endTime: 19, medianCpl: 8, topMoveMatchRate: 1 },
-    { gameKey: 'r3', endTime: 18, medianCpl: 10, topMoveMatchRate: 1 },
-    { gameKey: 'r4', endTime: 17, medianCpl: 12, topMoveMatchRate: 1 },
-    { gameKey: 'r5', endTime: 16, medianCpl: 14, topMoveMatchRate: 0 },
-    { gameKey: 'o1', endTime: 5, medianCpl: 45, topMoveMatchRate: 0 },
-    { gameKey: 'o2', endTime: 4, medianCpl: 50, topMoveMatchRate: 0 },
-    { gameKey: 'o3', endTime: 3, medianCpl: 55, topMoveMatchRate: 0 },
-    { gameKey: 'o4', endTime: 2, medianCpl: 60, topMoveMatchRate: 0 },
-    { gameKey: 'o5', endTime: 1, medianCpl: 65, topMoveMatchRate: 0 }
+    { gameKey: 'r1', endTime: 20, positionsScored: 2, medianCpl: 6, topMoveMatchRate: 1 },
+    { gameKey: 'r2', endTime: 19, positionsScored: 2, medianCpl: 8, topMoveMatchRate: 1 },
+    { gameKey: 'r3', endTime: 18, positionsScored: 2, medianCpl: 10, topMoveMatchRate: 1 },
+    { gameKey: 'r4', endTime: 17, positionsScored: 2, medianCpl: 12, topMoveMatchRate: 1 },
+    { gameKey: 'r5', endTime: 16, positionsScored: 2, medianCpl: 14, topMoveMatchRate: 0 },
+    { gameKey: 'o1', endTime: 5, positionsScored: 2, medianCpl: 45, topMoveMatchRate: 0 },
+    { gameKey: 'o2', endTime: 4, positionsScored: 2, medianCpl: 50, topMoveMatchRate: 0 },
+    { gameKey: 'o3', endTime: 3, positionsScored: 2, medianCpl: 55, topMoveMatchRate: 0 },
+    { gameKey: 'o4', endTime: 2, positionsScored: 2, medianCpl: 60, topMoveMatchRate: 0 },
+    { gameKey: 'o5', endTime: 1, positionsScored: 2, medianCpl: 65, topMoveMatchRate: 0 }
   ];
   const result = summarizeTemporalEngineBaseline(results);
   assert.equal(result.status, 'complete');
@@ -95,8 +95,8 @@ test('detects a temporal engine-quality shift across aggregated games', () => {
 
 test('does not infer a temporal engine shift from a small sample', () => {
   const result = summarizeTemporalEngineBaseline([
-    { gameKey: 'a', endTime: 2, medianCpl: 8, topMoveMatchRate: 1 },
-    { gameKey: 'b', endTime: 1, medianCpl: 30, topMoveMatchRate: 0 }
+    { gameKey: 'a', endTime: 2, positionsScored: 2, medianCpl: 8, topMoveMatchRate: 1 },
+    { gameKey: 'b', endTime: 1, positionsScored: 2, medianCpl: 30, topMoveMatchRate: 0 }
   ]);
   assert.equal(result.status, 'insufficient');
   assert.equal(result.candidate, null);
