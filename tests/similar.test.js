@@ -2,16 +2,26 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { structuralSimilarity, findSimilarDecisions } from '../src/analysis/similar.js';
 
-const base = '........................k...................................K/w/-/-';
-const same = '.................p.............k..........................P...K/w/-/-';
-const differentTurn = '.................p.............k..........................P...K/b/-/-';
+const board = (whitePawn = false) => {
+  const squares = Array(64).fill('.');
+  squares[4] = 'k';
+  squares[60] = 'K';
+  if (whitePawn) squares[36] = 'P';
+  else squares[35] = 'p';
+  return squares.join('');
+};
+
+const base = `${board(false)}/w/-/-`;
+const same = `${board(true)}/w/-/-`;
+const differentTurn = `${board(true)}/b/-/-`;
 
 test('scores structurally similar positions highly', () => {
   const score = structuralSimilarity(same, same);
-  const nearby = structuralSimilarity(same, base);
+  const nearby = structuralSimilarity(same, `${board(true)}/w/KQkq/-`);
   assert.equal(score, 1);
   assert.ok(nearby > 0.82);
   assert.equal(structuralSimilarity(same, differentTurn), 0);
+  assert.equal(structuralSimilarity(same, base), 0.86);
 });
 
 test('finds comparable historical decisions without requiring exact FEN equality', () => {
