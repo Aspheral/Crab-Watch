@@ -4,6 +4,7 @@ import { detectCriticalPositions } from './analysis/critical.js';
 import { analyzeTiming } from './analysis/timing.js';
 import { analyzeWithEngine } from './analysis/engine.js';
 import { buildEngineBaseline, compareCurrentToBaseline } from './analysis/baseline.js';
+import { detectChangePoint } from './analysis/changepoint.js';
 import { createEvidenceReport } from './analysis/forensics.js';
 
 const GAME_STATE_KEY = 'crabWatchGameState';
@@ -13,7 +14,7 @@ const BASELINE_CACHE_PREFIX = 'crabWatchEngineBaseline:';
 const OFFSCREEN_PATH = 'offscreen.html';
 const HISTORY_CACHE_MS = 12 * 60 * 60 * 1000;
 const BASELINE_CACHE_MS = 7 * 24 * 60 * 60 * 1000;
-const VERSION = '0.8.0';
+const VERSION = '0.9.0';
 
 async function setCrabIcon() {
   try {
@@ -62,10 +63,7 @@ async function cachedEngineBaseline(username, historyGames, currentGameUrl) {
   const key = `${BASELINE_CACHE_PREFIX}${username.toLowerCase()}`;
   const stored = await chrome.storage.local.get(key);
   const cached = stored[key];
-  if (cached?.createdAt && Date.now() - cached.createdAt < BASELINE_CACHE_MS && cached?.status === 'complete') {
-    return { ...cached, fromCache: true };
-  }
-
+  if (cached?.createdAt && Date.now() - cached.createdAt < BASELINE_CACHE_MS && cached?.status === 'complete') return { ...cached, fromCache: true };
   const result = await buildEngineBaseline({
     games: historyGames,
     username,
@@ -110,16 +108,6 @@ async function runEnginePositions(positions, depth = 15, maxPositions = 8) {
   return analyzeWithEngine({ positions, depth, maxPositions });
 }
 
-async function runEngine(criticalAnalysis) {
-  if (!criticalAnalysis?.selected?.length) return { status: 'no-positions', results: [] };
-  try {
-    const result = await runEnginePositions(criticalAnalysis.selected, 15, 8);
-    return result;
-  } catch (error) {
-    return { status: 'unavailable', engine: 'Stockfish 18 lite single-threaded', results: [], error: error.message };
-  }
-}
-
 async function requestReview(sendResponse) {
   const stored = await chrome.storage.local.get(GAME_STATE_KEY);
   const state = stored[GAME_STATE_KEY];
@@ -131,6 +119,7 @@ async function requestReview(sendResponse) {
   const games = history.games || [];
   const currentGame = findCurrentGame(games, state) || state;
   const historyAnalysis = compareCurrentGameToHistory(opponent, currentGame, games);
+  const changePointAnalysis = detectChangePoint(games.slice(0, HISTORY_WINDOW), opponent);
   const opponentColor = colorForPlayer(currentGame, opponent);
   const criticalAnalysis = currentGame?.pgn ? await detectCriticalPositions(currentGame.pgn, opponentColor, 12) : null;
   const timingAnalysis = currentGame?.pgn ? analyzeTiming(currentGame.pgn, opponentColor) : null;
@@ -160,7 +149,8 @@ async function requestReview(sendResponse) {
     criticalAnalysis,
     timingAnalysis,
     engineAnalysis,
-    engineBaseline
+    engineBaseline,
+    changePointAnalysis
   });
 
   const review = {
@@ -174,6 +164,7 @@ async function requestReview(sendResponse) {
     historyFetchedAt: history.fetchedAt,
     fromCache: history.fromCache,
     historyAnalysis,
+    changePointAnalysis,
     criticalAnalysis,
     timingAnalysis,
     engineAnalysis,
