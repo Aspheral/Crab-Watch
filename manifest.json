@@ -9,12 +9,6 @@
     "default_title": "Crab Watch",
     "default_popup": "popup.html"
   },
-  "icons": {
-    "16": "assets/crab.svg",
-    "32": "assets/crab.svg",
-    "48": "assets/crab.svg",
-    "128": "assets/crab.svg"
-  },
   "content_scripts": [
     {
       "matches": ["https://www.chess.com/*"],
