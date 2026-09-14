@@ -35,6 +35,18 @@ test('aggregates multiple engine positions into one game-level result', () => {
   assert.equal(games[1].medianCpl, 40);
 });
 
+test('excludes incomplete engine positions from baseline aggregation', () => {
+  const games = aggregateEngineResultsByGame([
+    { gameKey: 'a', endTime: 10, centipawnLoss: 10, bestMoveMatches: true },
+    { gameKey: 'a', endTime: 10, centipawnLoss: null, bestMoveMatches: true },
+    { gameKey: 'b', endTime: 9, bestMoveMatches: false }
+  ]);
+  assert.equal(games.length, 1);
+  assert.equal(games[0].gameKey, 'a');
+  assert.equal(games[0].positionsScored, 1);
+  assert.equal(games[0].topMoveMatchRate, 1);
+});
+
 test('compares current game against personal baseline', () => {
   const result = compareCurrentToBaseline(
     {
