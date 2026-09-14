@@ -65,7 +65,8 @@ function findCurrentGame(history, state) {
     const byUrl = history.find(game => String(game.url || '').replace(/\/$/, '') === normalized);
     if (byUrl) return byUrl;
   }
-  return state?.embeddedPgn ? { pgn: state.embeddedPgn } : null;
+  const pgn = state?.embeddedPgn || state?.moveText || null;
+  return pgn ? { pgn } : null;
 }
 
 async function requestReview(sendResponse) {
