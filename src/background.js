@@ -35,7 +35,12 @@ async function setCrabIcon() {
   } catch {}
 }
 
+function isComputerGame(game) {
+  return /\/game\/computer\//i.test(String(game?.url || ''));
+}
+
 function opponentFor(game) {
+  if (game?.opponent) return game.opponent;
   if (!Array.isArray(game?.players) || game.players.length < 2) return null;
   const current = game.currentUser?.toLowerCase();
   if (!current) return null;
@@ -84,7 +89,7 @@ function findCurrentGame(history, state) {
     if (byUrl) return byUrl;
   }
   const pgn = state?.embeddedPgn || state?.moveText || null;
-  return pgn ? { pgn } : null;
+  return pgn ? { ...state, pgn } : state || null;
 }
 
 async function ensureOffscreenDocument() {
@@ -104,21 +109,37 @@ async function requestReview(sendResponse) {
   const stored = await chrome.storage.local.get(GAME_STATE_KEY);
   const state = stored[GAME_STATE_KEY];
   if (!state?.finished) throw new Error('No completed game is available.');
-  const opponent = opponentFor(state);
-  if (!validUsername(opponent)) throw new Error('Crab Watch could not identify the opponent from the completed game.');
 
-  const history = await cachedHistory(opponent);
+  const computerGame = isComputerGame(state);
+  const opponent = opponentFor(state);
+  if (!computerGame && !validUsername(opponent)) throw new Error('Crab Watch could not identify the opponent from the completed game.');
+
+  let history = { player: null, games: [], fetchedAt: null, fromCache: false };
+  if (!computerGame && validUsername(opponent)) {
+    try {
+      history = await cachedHistory(opponent);
+    } catch (error) {
+      throw new Error(`Could not load the opponent's public history: ${error.message}`);
+    }
+  } else if (computerGame && validUsername(opponent)) {
+    try {
+      history = await cachedHistory(opponent);
+    } catch {}
+  }
+
   const games = history.games || [];
   const historyWindow = games.slice(0, HISTORY_WINDOW);
   const currentGame = findCurrentGame(games, state) || state;
-  const historyAnalysis = compareCurrentGameToHistory(opponent, currentGame, games);
-  const changePointAnalysis = detectChangePoint(historyWindow, opponent);
+  const historyAnalysis = computerGame && !games.length
+    ? { status: 'computer-game', observations: ['Computer game: no public opponent history baseline.'] }
+    : compareCurrentGameToHistory(opponent, currentGame, games);
+  const changePointAnalysis = games.length >= 16 ? detectChangePoint(historyWindow, opponent) : { status: 'insufficient' };
   const opponentColor = colorForPlayer(currentGame, opponent);
   const criticalAnalysis = currentGame?.pgn ? await detectCriticalPositions(currentGame.pgn, opponentColor, 12) : null;
   const timingAnalysis = currentGame?.pgn ? analyzeTiming(currentGame.pgn, opponentColor) : null;
 
   let similarPositionAnalysis = { status: 'no-pgn', matches: [], selected: [] };
-  if (currentGame?.pgn && criticalAnalysis?.selected?.length) {
+  if (currentGame?.pgn && criticalAnalysis?.selected?.length && historyWindow.length) {
     const matches = criticalAnalysis.selected.flatMap(critical => findSimilarDecisions(critical.before, historyWindow, opponent, { maxMatches: 8, currentMove: critical.move, currentSan: critical.san }).map(match => ({ currentPly: critical.ply, currentSan: critical.san, currentMoveNumber: critical.moveNumber, ...match })));
     matches.sort((a, b) => (b.decisionSimilarity - a.decisionSimilarity) || (b.adjustedSimilarity - a.adjustedSimilarity) || a.currentPly - b.currentPly);
     similarPositionAnalysis = { status: matches.length ? 'complete' : 'no-matches', matches: matches.slice(0, 32), selected: matches.slice(0, 12), currentCriticalPositions: criticalAnalysis.selected.length };
@@ -130,7 +151,7 @@ async function requestReview(sendResponse) {
     try {
       await ensureOffscreenDocument();
       engineAnalysis = await analyzeWithEngine({ positions: criticalAnalysis.selected, depth: 15, maxPositions: 8 });
-      if (engineAnalysis.status === 'complete') {
+      if (engineAnalysis.status === 'complete' && !computerGame && historyWindow.length) {
         const baselineRaw = await cachedEngineBaseline(opponent, historyWindow, currentGame.url || state.url || null);
         engineBaseline = { ...baselineRaw, comparison: compareCurrentToBaseline(engineAnalysis, baselineRaw) };
       }
@@ -141,8 +162,8 @@ async function requestReview(sendResponse) {
     }
   }
 
-  const evidence = createEvidenceReport({ game: { ...currentGame, finished: true }, history: historyWindow, player: opponent, historyAnalysis, criticalAnalysis, timingAnalysis, engineAnalysis, engineBaseline, changePointAnalysis, similarPositionAnalysis });
-  const review = { version: VERSION, completedGame: currentGame, opponent, history: historyWindow, accountContextCount: games.length, player: history.player || null, historyCount: Math.min(games.length, HISTORY_WINDOW), historyFetchedAt: history.fetchedAt, fromCache: history.fromCache, historyAnalysis, changePointAnalysis, criticalAnalysis, similarPositionAnalysis, timingAnalysis, engineAnalysis, engineBaseline, evidence, analysis: { engine: engineAnalysis.engine || 'Stockfish 18 lite single-threaded', status: evidence.assessment.level }, readyForAnalysisAt: Date.now() };
+  const evidence = createEvidenceReport({ game: { ...currentGame, finished: true }, history: historyWindow, player: opponent || 'computer', historyAnalysis, criticalAnalysis, timingAnalysis, engineAnalysis, engineBaseline, changePointAnalysis, similarPositionAnalysis });
+  const review = { version: VERSION, completedGame: currentGame, opponent: opponent || null, gameType: computerGame ? 'computer' : 'human', history: historyWindow, accountContextCount: games.length, player: history.player || null, historyCount: Math.min(games.length, HISTORY_WINDOW), historyFetchedAt: history.fetchedAt, fromCache: history.fromCache, historyAnalysis, changePointAnalysis, criticalAnalysis, similarPositionAnalysis, timingAnalysis, engineAnalysis, engineBaseline, evidence, analysis: { engine: engineAnalysis.engine || 'Stockfish 18 lite single-threaded', status: evidence.assessment.level }, readyForAnalysisAt: Date.now() };
   await chrome.storage.local.set({ [REVIEW_KEY]: review });
   sendResponse({ ok: true, review });
 }
