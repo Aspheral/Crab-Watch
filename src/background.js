@@ -1,11 +1,11 @@
-import { getRecentGames, validUsername, MAX_GAMES } from './chesscom-api.js';
+import { getRecentGames, validUsername, HISTORY_WINDOW, ACCOUNT_CONTEXT_WINDOW } from './chesscom-api.js';
 import { compareCurrentGameToHistory } from './analysis/history.js';
 import { createEvidenceReport } from './analysis/forensics.js';
 
 const GAME_STATE_KEY = 'crabWatchGameState';
 const REVIEW_KEY = 'crabWatchReview';
 const CACHE_KEY_PREFIX = 'crabWatchHistory:';
-const VERSION = '0.4.0';
+const VERSION = '0.4.1';
 
 async function setCrabIcon() {
   try {
@@ -39,7 +39,7 @@ async function cachedHistory(username) {
   if (cached?.fetchedAt && Date.now() - cached.fetchedAt < 12 * 60 * 60 * 1000) {
     return { ...cached, fromCache: true };
   }
-  const result = await getRecentGames(username, MAX_GAMES);
+  const result = await getRecentGames(username, ACCOUNT_CONTEXT_WINDOW);
   await chrome.storage.local.set({ [key]: result });
   return { ...result, fromCache: false };
 }
@@ -65,36 +65,27 @@ async function requestReview(sendResponse) {
   if (!state?.finished) throw new Error('No completed game is available.');
 
   const opponent = opponentFor(state);
-  if (!validUsername(opponent)) {
-    throw new Error('Crab Watch could not identify the opponent from the completed game.');
-  }
+  if (!validUsername(opponent)) throw new Error('Crab Watch could not identify the opponent from the completed game.');
 
   const history = await cachedHistory(opponent);
   const games = history.games || [];
   const currentGame = findCurrentGame(games, state) || state;
   const historyAnalysis = compareCurrentGameToHistory(opponent, currentGame, games);
-  const evidence = createEvidenceReport({
-    game: { ...currentGame, finished: true },
-    history: games,
-    player: opponent,
-    historyAnalysis
-  });
+  const evidence = createEvidenceReport({ game: { ...currentGame, finished: true }, history: games.slice(0, HISTORY_WINDOW), player: opponent, historyAnalysis });
 
   const review = {
     version: VERSION,
     completedGame: currentGame,
     opponent,
-    history: games,
+    history: games.slice(0, HISTORY_WINDOW),
+    accountContextCount: games.length,
     player: history.player || null,
-    historyCount: games.length,
+    historyCount: Math.min(games.length, HISTORY_WINDOW),
     historyFetchedAt: history.fetchedAt,
     fromCache: history.fromCache,
     historyAnalysis,
     evidence,
-    analysis: {
-      engine: 'not-run',
-      status: 'history-context-ready'
-    },
+    analysis: { engine: 'not-run', status: 'history-context-ready' },
     readyForAnalysisAt: Date.now()
   };
 
@@ -108,7 +99,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     chrome.storage.local.set({ [GAME_STATE_KEY]: state }).then(() => sendResponse({ ok: true }));
     return true;
   }
-
   if (message?.type === 'REQUEST_REVIEW') {
     requestReview(sendResponse).catch(error => sendResponse({ ok: false, error: error.message }));
     return true;
@@ -116,11 +106,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 chrome.runtime.onInstalled.addListener(async () => {
-  await chrome.storage.local.set({
-    crabWatchVersion: VERSION,
-    analysisPolicy: 'post-game-only',
-    historyWindow: MAX_GAMES
-  });
+  await chrome.storage.local.set({ crabWatchVersion: VERSION, analysisPolicy: 'post-game-only', historyWindow: HISTORY_WINDOW, accountContextWindow: ACCOUNT_CONTEXT_WINDOW });
   await setCrabIcon();
 });
 
