@@ -4,7 +4,8 @@
   // It contains no chess engine, evaluation, move suggestion, or live analysis.
 
   const GAME_PATH = /\/game\/(?:live|daily|computer)\//i;
-  const FINISH_RE = /checkmate|resign|resignation|stalemate|draw|timeout|time\s*forfeit|abandon/i;
+  const FINISH_TEXT_RE = /game\s+(?:over|review)|rematch|resign(?:ed|ation)?|checkmate|stalemate|draw(?:\s+agreed)?|timeout|time\s*forfeit|abandon(?:ed)?|you\s+(?:won|lost)|won\s+by|lost\s+by|game\s+ended/i;
+  const FINISH_SELECTOR_RE = /game[-_\s]?(?:over|review|result|complete)|rematch/i;
   let lastUrl = location.href;
   let announced = false;
   let launcher = null;
@@ -15,10 +16,20 @@
 
   function isGamePage() { return GAME_PATH.test(location.pathname); }
 
+  function hasFinishedControl() {
+    const nodes = document.querySelectorAll('button, a, [role="button"], [data-cy], [data-test], [class]');
+    for (const node of nodes) {
+      const text = clean(node.innerText || node.getAttribute?.('aria-label') || node.getAttribute?.('title') || node.getAttribute?.('data-cy') || node.getAttribute?.('data-test') || node.className);
+      if (text && FINISH_SELECTOR_RE.test(text)) return true;
+    }
+    return false;
+  }
+
   function looksFinished() {
     if (!isGamePage()) return false;
     const text = document.body?.innerText || '';
-    return FINISH_RE.test(text) && /game|won|lost|draw|checkmate|resign|timeout|stalemate/i.test(text);
+    if (FINISH_TEXT_RE.test(text)) return true;
+    return hasFinishedControl();
   }
 
   function usernameFromHref(href) {
@@ -195,11 +206,12 @@
 
   function check() {
     if (location.href !== lastUrl) { lastUrl = location.href; announced = false; clearUi(); }
-    if (announced) return;
     const game = readCompletedGame();
     if (!game) return;
-    announced = true;
-    chrome.runtime.sendMessage({ type: 'GAME_FINISHED', payload: game }).catch(() => {});
+    if (!announced) {
+      announced = true;
+      chrome.runtime.sendMessage({ type: 'GAME_FINISHED', payload: game }).catch(() => {});
+    }
     ensureLauncher(game);
   }
 
