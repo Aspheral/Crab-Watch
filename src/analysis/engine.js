@@ -43,10 +43,20 @@ export function parseInfoScore(line) {
 }
 
 export function scoreLoss(bestScore, playedScore) {
-  const best = toCp(bestScore);
-  const played = toCp(playedScore);
-  if (best === null || played === null) return null;
-  return Math.max(0, Math.round(best - played));
+  if (!bestScore || !playedScore || !Number.isFinite(bestScore.value) || !Number.isFinite(playedScore.value)) return null;
+  if (bestScore.type === 'mate' || playedScore.type === 'mate') {
+    if (bestScore.type === 'mate' && playedScore.type === 'mate') {
+      if (bestScore.value > 0 && playedScore.value > 0) return Math.max(0, playedScore.value - bestScore.value);
+      if (bestScore.value < 0 && playedScore.value < 0) return Math.max(0, bestScore.value - playedScore.value);
+      if (bestScore.value > 0 && playedScore.value < 0) return 100000 + Math.abs(playedScore.value) - bestScore.value;
+      if (bestScore.value < 0 && playedScore.value > 0) return 0;
+    }
+    const best = toCp(bestScore);
+    const played = toCp(playedScore);
+    if (best === null || played === null) return null;
+    return Math.max(0, Math.round(best - played));
+  }
+  return Math.max(0, Math.round(bestScore.value - playedScore.value));
 }
 
 export function movesMatch(playedMove, bestMove) {
