@@ -21,9 +21,11 @@ test('history analyzer summarizes a public sample', () => {
   assert.ok(result.openingPatterns[0].share >= 0.99);
 });
 
-test('large history is capped at the analysis window but remains contextual', () => {
+test('large history is capped for behavioral analysis but remains contextual', () => {
   const history = Array.from({ length: 351 }, (_, i) => game(i + 1, 1500));
   const result = compareCurrentGameToHistory('Target', game(999, 1500), history);
   assert.equal(result.stats.gameCount, 300);
-  assert.equal(result.observations.some(x => x.kind === 'large-history'), false);
+  assert.equal(result.stats.availableGames, 351);
+  assert.equal(result.stats.largeHistory, true);
+  assert.equal(result.observations.some(x => x.kind === 'large-history'), true);
 });
