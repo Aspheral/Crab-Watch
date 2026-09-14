@@ -31,7 +31,15 @@ function renderHistoryShape(count) {
   }
 }
 
-function renderEvidence(evidence) {
+function signalStatus(signal) {
+  if (signal?.observations?.length) return 'context found';
+  if (signal?.status === 'no-data') return 'no clock data';
+  if (signal?.status === 'no-baseline') return 'not enough history';
+  if (signal?.status === 'insufficient') return 'not enough sample';
+  return 'no finding';
+}
+
+function renderEvidence(evidence, engineBaseline) {
   if (!evidence) return;
   assessment.hidden = false;
   const level = evidence.assessment?.level;
@@ -56,6 +64,12 @@ function renderEvidence(evidence) {
     ['Critical positions', evidence.signals.positionDifficulty],
     ['Engine', evidence.signals.moveQuality],
     ['Personal baseline', evidence.signals.humanErrorProfile],
+    ['Engine trend', engineBaseline?.temporal ? {
+      observations: engineBaseline.temporal.status === 'complete' && (engineBaseline.temporal.cplShift !== null || engineBaseline.temporal.matchRateDelta !== null)
+        ? [{ kind: 'temporal-engine-summary' }]
+        : [],
+      status: engineBaseline.temporal.status === 'complete' ? 'complete' : 'insufficient'
+    } : null],
     ['Change point', evidence.signals.changePoint],
     ['Similar positions', evidence.signals.similarPosition],
     ['Timing', evidence.signals.timing],
@@ -67,13 +81,15 @@ function renderEvidence(evidence) {
     const left = document.createElement('span');
     left.textContent = label;
     const right = document.createElement('span');
-    right.textContent = signal?.observations?.length
-      ? 'context found'
-      : signal?.status === 'no-data'
-        ? 'no clock data'
-        : signal?.status === 'no-baseline'
-          ? 'not enough history'
-          : 'no finding';
+    if (label === 'Engine trend' && engineBaseline?.temporal?.status === 'complete') {
+      const temporal = engineBaseline.temporal;
+      const parts = [];
+      if (Number.isFinite(temporal.cplShift)) parts.push(`${temporal.cplShift <= 0 ? 'CPL ↓' : 'CPL ↑'} ${Math.abs(Math.round(temporal.cplShift))}`);
+      if (Number.isFinite(temporal.matchRateDelta)) parts.push(`top-move ${temporal.matchRateDelta >= 0 ? '↑' : '↓'} ${Math.round(Math.abs(temporal.matchRateDelta) * 100)}%`);
+      right.textContent = parts.length ? parts.join(' · ') : 'no finding';
+    } else {
+      right.textContent = signalStatus(signal);
+    }
     row.append(left, right);
     signals.appendChild(row);
   }
@@ -86,7 +102,7 @@ async function renderStoredReview(review) {
   const critical = review.criticalAnalysis?.selected || [];
   criticalCount.textContent = critical.length || '0';
   result.textContent = review.evidence?.assessment?.level === 'context-only' ? 'In context' : 'Reviewed';
-  renderEvidence(review.evidence);
+  renderEvidence(review.evidence, review.engineBaseline);
 }
 
 async function load() {
