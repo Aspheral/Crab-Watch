@@ -1,12 +1,13 @@
 import { getRecentGames, validUsername, HISTORY_WINDOW, ACCOUNT_CONTEXT_WINDOW } from './chesscom-api.js';
 import { compareCurrentGameToHistory } from './analysis/history.js';
 import { detectCriticalPositions } from './analysis/critical.js';
+import { analyzeTiming } from './analysis/timing.js';
 import { createEvidenceReport } from './analysis/forensics.js';
 
 const GAME_STATE_KEY = 'crabWatchGameState';
 const REVIEW_KEY = 'crabWatchReview';
 const CACHE_KEY_PREFIX = 'crabWatchHistory:';
-const VERSION = '0.5.0';
+const VERSION = '0.6.0';
 
 async function setCrabIcon() {
   try {
@@ -85,12 +86,16 @@ async function requestReview(sendResponse) {
   const criticalAnalysis = currentGame?.pgn
     ? await detectCriticalPositions(currentGame.pgn, opponentColor, 12)
     : null;
+  const timingAnalysis = currentGame?.pgn
+    ? analyzeTiming(currentGame.pgn, opponentColor)
+    : null;
   const evidence = createEvidenceReport({
     game: { ...currentGame, finished: true },
     history: games.slice(0, HISTORY_WINDOW),
     player: opponent,
     historyAnalysis,
-    criticalAnalysis
+    criticalAnalysis,
+    timingAnalysis
   });
 
   const review = {
@@ -105,8 +110,12 @@ async function requestReview(sendResponse) {
     fromCache: history.fromCache,
     historyAnalysis,
     criticalAnalysis,
+    timingAnalysis,
     evidence,
-    analysis: { engine: 'not-run', status: criticalAnalysis ? 'critical-positions-ready' : 'history-context-ready' },
+    analysis: {
+      engine: 'not-run',
+      status: criticalAnalysis ? 'critical-positions-ready' : 'history-context-ready'
+    },
     readyForAnalysisAt: Date.now()
   };
 
