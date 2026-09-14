@@ -20,13 +20,17 @@
     return FINISH_RE.test(text) && /game|won|lost|draw|checkmate|resign|timeout|stalemate/i.test(text);
   }
 
+  function usernameFromHref(href) {
+    const match = href?.match(/\/member\/([A-Za-z0-9_-]{2,25})\/?$/i);
+    return match?.[1] || null;
+  }
+
   function playerLinks() {
     const seen = new Set();
     const players = [];
     for (const anchor of document.querySelectorAll('a[href*="/member/"]')) {
-      const match = anchor.href.match(/\/member\/([A-Za-z0-9_-]{2,25})\/?$/i);
-      if (!match) continue;
-      const username = match[1];
+      const username = usernameFromHref(anchor.href);
+      if (!username) continue;
       const key = username.toLowerCase();
       if (!seen.has(key)) {
         seen.add(key);
@@ -37,12 +41,45 @@
   }
 
   function likelyCurrentUser(players) {
-    // Prefer profile links outside the board/game panels. This is only an
-    // identity hint; we never guess an opponent when the page is ambiguous.
-    const candidates = [...document.querySelectorAll('header a[href*="/member/"], nav a[href*="/member/"], [class*="sidebar"] a[href*="/member/"]')]
-      .map(a => a.href.match(/\/member\/([A-Za-z0-9_-]{2,25})\/?$/i)?.[1])
-      .filter(Boolean);
-    return candidates.find(name => players.some(p => p.toLowerCase() === name.toLowerCase())) || null;
+    // Chess.com's game DOM has changed several times. Prefer explicit user
+    // metadata when it exists, then fall back to strongly-scoped account/profile
+    // links. Never choose an opponent's ordinary board profile link as "self".
+    const playerKeys = new Map(players.map(name => [name.toLowerCase(), name]));
+    const candidates = [];
+
+    for (const node of document.querySelectorAll('[data-username], [data-user], [data-member], a[href*="/member/"]')) {
+      const hrefUsername = usernameFromHref(node.getAttribute?.('href'));
+      const explicitUsername = node.getAttribute?.('data-username') || node.getAttribute?.('data-user') || node.getAttribute?.('data-member');
+      const username = explicitUsername || hrefUsername;
+      if (!username || !playerKeys.has(username.toLowerCase())) continue;
+
+      let score = 0;
+      const attrText = [
+        node.getAttribute?.('data-test'),
+        node.getAttribute?.('data-cy'),
+        node.getAttribute?.('data-component'),
+        node.getAttribute?.('aria-label'),
+        node.getAttribute?.('title'),
+      ].filter(Boolean).join(' ').toLowerCase();
+      const classText = String(node.className || '').toLowerCase();
+      const ancestorText = node.closest?.('header, nav, footer, [class*="sidebar"], [class*="account"], [class*="profile"], [class*="user-menu"]') ? 'scoped' : '';
+
+      if (explicitUsername) score += 100;
+      if (node.getAttribute?.('aria-current') === 'page' || node.getAttribute?.('aria-current') === 'true') score += 60;
+      if (/account|current.?user|user.?menu|profile.?menu/.test(attrText)) score += 45;
+      if (/account|current.?user|user.?menu|profile.?menu/.test(classText)) score += 35;
+      if (/settings|preferences|my profile|your profile|my account/.test(attrText)) score += 30;
+      if (ancestorText) score += 15;
+      if (/^\/member\//i.test(node.getAttribute?.('href') || '') && node.closest?.('header, nav, footer')) score += 10;
+
+      candidates.push({ username: playerKeys.get(username.toLowerCase()), score });
+    }
+
+    candidates.sort((a, b) => b.score - a.score);
+    const best = candidates[0];
+    if (best && best.score >= 40) return best.username;
+
+    return null;
   }
 
   function extractMoves() {
