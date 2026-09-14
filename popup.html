@@ -13,14 +13,14 @@
         <img src="assets/crab.svg" alt="" class="logo">
         <span>Crab Watch</span>
       </div>
-      <button class="icon-button" id="settings" aria-label="Settings">⚙</button>
+      <button class="icon-button" id="settings" aria-label="Open Crab Watch on GitHub">↗</button>
     </header>
 
     <section class="hero" id="state">
       <div class="hero-icon"><img src="assets/crab.svg" alt=""></div>
       <div>
         <h1>Review a finished game</h1>
-        <p>Crab Watch looks for unusual patterns in completed games and account history.</p>
+        <p>Crab Watch compares a completed game with the opponent's recent play.</p>
       </div>
     </section>
 
@@ -30,15 +30,20 @@
           <span class="eyebrow">Recent game</span>
           <h2 id="opponent">Opponent</h2>
         </div>
-        <span class="result" id="result">—</span>
+        <span class="result" id="result">Ready</span>
       </div>
-      <div class="meter" aria-label="Review status"><span id="meterFill"></span></div>
+
+      <div class="history-visual" aria-label="Recent game history">
+        <div class="history-bars" id="historyBars"></div>
+        <div class="history-caption"><span id="historyCount">0</span> recent games</div>
+      </div>
+
       <div class="row"><span>Game</span><span id="gameMeta">Finished</span></div>
     </section>
 
     <button class="primary" id="review" disabled>Review game</button>
-
-    <p class="footnote">Analysis begins only after a game has finished.</p>
+    <p class="error" id="error" hidden></p>
+    <p class="footnote">Nothing is analyzed while a game is in progress.</p>
   </main>
   <script src="src/popup.js"></script>
 </body>
