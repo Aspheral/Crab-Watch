@@ -49,6 +49,12 @@ export function scoreLoss(bestScore, playedScore) {
   return Math.max(0, Math.round(best - played));
 }
 
+export function movesMatch(playedMove, bestMove) {
+  const played = String(playedMove || '').trim().toLowerCase();
+  const best = String(bestMove || '').trim().toLowerCase();
+  return Boolean(played && best && played === best);
+}
+
 export async function analyzeWithEngine({ positions, depth = DEFAULT_DEPTH, maxPositions = MAX_POSITIONS } = {}) {
   const selected = (Array.isArray(positions) ? positions : []).slice(0, maxPositions);
   if (!selected.length) return { status: 'no-positions', engine: 'Stockfish 18 lite single-threaded', results: [] };
