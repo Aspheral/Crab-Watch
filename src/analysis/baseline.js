@@ -1,7 +1,7 @@
 import { detectCriticalPositions } from './critical.js';
 
 export const BASELINE_GAMES = 12;
-export const BASELINE_MAX_POSITIONS = 1;
+export const BASELINE_MAX_POSITIONS = 2;
 export const TEMPORAL_MIN_GAMES = 4;
 
 function normalizedUrl(game) {
@@ -50,6 +50,29 @@ export function summarizeEngineBaseline(results = []) {
   return summarizeResults(results);
 }
 
+export function aggregateEngineResultsByGame(results = []) {
+  const grouped = new Map();
+  for (const item of results) {
+    const gameKey = item?.gameKey;
+    if (!gameKey) continue;
+    if (!grouped.has(gameKey)) grouped.set(gameKey, []);
+    grouped.get(gameKey).push(item);
+  }
+
+  return [...grouped.entries()].map(([gameKey, items]) => {
+    const losses = items.map(item => item.centipawnLoss).filter(Number.isFinite);
+    const matchValues = items.filter(item => typeof item.bestMoveMatches === 'boolean').map(item => item.bestMoveMatches ? 1 : 0);
+    return {
+      gameKey,
+      endTime: items.map(item => Number(item.endTime)).find(Number.isFinite) ?? null,
+      positionsScored: items.length,
+      medianCpl: median(losses),
+      meanCpl: losses.length ? losses.reduce((sum, value) => sum + value, 0) / losses.length : null,
+      topMoveMatchRate: matchValues.length ? matchValues.reduce((sum, value) => sum + value, 0) / matchValues.length : null
+    };
+  }).filter(item => item.positionsScored > 0);
+}
+
 function temporalCandidate(ordered, split, minGames) {
   const recent = ordered.slice(0, split);
   const older = ordered.slice(split);
@@ -69,7 +92,7 @@ function temporalCandidate(ordered, split, minGames) {
 }
 
 export function summarizeTemporalEngineBaseline(results = [], { minGames = TEMPORAL_MIN_GAMES } = {}) {
-  const usable = results.filter(item => Number.isFinite(item.centipawnLoss) || typeof item.bestMoveMatches === 'boolean');
+  const usable = results.filter(item => Number.isFinite(item.medianCpl) || Number.isFinite(item.meanCpl) || Number.isFinite(item.topMoveMatchRate));
   if (usable.length < minGames * 2) {
     return { status: 'insufficient', recent: null, older: null, cplShift: null, matchRateDelta: null, candidate: null, candidates: [] };
   }
@@ -105,17 +128,22 @@ export async function buildEngineBaseline({ games = [], username, currentGameUrl
     const color = opponentSide(game, username);
     const critical = await detectCriticalPositions(game.pgn, color, 4);
     const selected = critical.selected?.slice(0, BASELINE_MAX_POSITIONS) || [];
-    if (selected.length) positions.push({ ...selected[0], gameKey: normalizedUrl(game) || game.start_time || game.end_time || null, endTime: game.end_time || game.start_time || null });
+    const gameKey = normalizedUrl(game) || game.start_time || game.end_time || null;
+    const endTime = game.end_time || game.start_time || null;
+    for (const position of selected) positions.push({ ...position, gameKey, endTime });
   }
-  if (!positions.length) return { status: 'no-positions', sampleSize: sample.length, results: [], summary: summarizeEngineBaseline([]), temporal: summarizeTemporalEngineBaseline([]) };
+  if (!positions.length) return { status: 'no-positions', sampleSize: sample.length, results: [], gameSummaries: [], summary: summarizeEngineBaseline([]), temporal: summarizeTemporalEngineBaseline([]) };
   const engineResult = await analyzePositions(positions);
   const results = (engineResult?.results || []).map((item, index) => ({ ...item, gameKey: positions[index]?.gameKey || null, endTime: positions[index]?.endTime || null }));
+  const gameSummaries = aggregateEngineResultsByGame(results);
   return {
     status: engineResult?.status === 'complete' ? 'complete' : (engineResult?.status || 'unavailable'),
     sampleSize: sample.length,
+    positionsRequested: positions.length,
     results,
+    gameSummaries,
     summary: summarizeEngineBaseline(results),
-    temporal: summarizeTemporalEngineBaseline(results)
+    temporal: summarizeTemporalEngineBaseline(gameSummaries)
   };
 }
 
