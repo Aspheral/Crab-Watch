@@ -64,8 +64,8 @@ async function cachedEngineBaseline(username, historyGames, currentGameUrl) {
   const key = `${BASELINE_CACHE_PREFIX}${username.toLowerCase()}`;
   const stored = await chrome.storage.local.get(key);
   const cached = stored[key];
-  if (cached?.createdAt && Date.now() - cached.createdAt < BASELINE_CACHE_MS && cached?.status === 'complete' && cached?.sampleSize >= 12) return { ...cached, fromCache: true };
-  const result = await buildEngineBaseline({ games: historyGames, username, currentGameUrl, analyzePositions: positions => runEnginePositions(positions, 12, 12) });
+  if (cached?.createdAt && Date.now() - cached.createdAt < BASELINE_CACHE_MS && cached?.status === 'complete' && cached?.positionsRequested >= 24) return { ...cached, fromCache: true };
+  const result = await buildEngineBaseline({ games: historyGames, username, currentGameUrl, analyzePositions: positions => runEnginePositions(positions, 12, 24) });
   const value = { ...result, createdAt: Date.now(), fromCache: false };
   await chrome.storage.local.set({ [key]: value });
   return value;
@@ -161,7 +161,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 chrome.runtime.onInstalled.addListener(async () => {
-  await chrome.storage.local.set({ crabWatchVersion: VERSION, analysisPolicy: 'post-game-only', historyWindow: HISTORY_WINDOW, accountContextWindow: ACCOUNT_CONTEXT_WINDOW, engineBaselineGames: 12 });
+  await chrome.storage.local.set({ crabWatchVersion: VERSION, analysisPolicy: 'post-game-only', historyWindow: HISTORY_WINDOW, accountContextWindow: ACCOUNT_CONTEXT_WINDOW, engineBaselineGames: 12, engineBaselinePositionsPerGame: 2 });
   await setCrabIcon();
 });
 
