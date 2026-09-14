@@ -108,13 +108,43 @@ export function structuralSimilarity(a, b) {
   return weight ? score / weight : 0;
 }
 
+function moveTypeFromSan(san) {
+  const stripped = String(san || '').replace(/^[+#?!]+|[+#?!]+$/g, '');
+  return /^[KQRBN]/.test(stripped) ? stripped[0] : 'P';
+}
+
+function moveGeometry(move) {
+  if (!move?.from || !move?.to || move.from.length !== 2 || move.to.length !== 2) return null;
+  const fileDelta = move.to.charCodeAt(0) - move.from.charCodeAt(0);
+  const rankDelta = Number(move.to[1]) - Number(move.from[1]);
+  return { fileDelta, rankDelta, distance: Math.max(Math.abs(fileDelta), Math.abs(rankDelta)) };
+}
+
+export function decisionSimilarity(currentMove, currentSan, historicalMove, historicalSan) {
+  if (!currentMove || !historicalMove) return 0;
+  const currentGeometry = moveGeometry(currentMove);
+  const historicalGeometry = moveGeometry(historicalMove);
+  if (!currentGeometry || !historicalGeometry) return 0;
+
+  const origin = currentMove.from === historicalMove.from ? 1 : 0;
+  const destination = currentMove.to === historicalMove.to ? 1 : 0;
+  const promotion = (currentMove.promotion || null) === (historicalMove.promotion || null) ? 1 : 0;
+  const geometry = currentGeometry.fileDelta === historicalGeometry.fileDelta && currentGeometry.rankDelta === historicalGeometry.rankDelta ? 1 : currentGeometry.distance === historicalGeometry.distance ? 0.65 : 0;
+  const currentCapture = /x/.test(String(currentSan || ''));
+  const historicalCapture = /x/.test(String(historicalSan || ''));
+  const capture = currentCapture === historicalCapture ? 1 : 0;
+  const piece = moveTypeFromSan(currentSan) === moveTypeFromSan(historicalSan) ? 1 : 0;
+
+  return origin * 0.20 + destination * 0.30 + promotion * 0.10 + geometry * 0.20 + capture * 0.10 + piece * 0.10;
+}
+
 function openingDiscount(ply) {
   if (ply <= 12) return 0.70;
   if (ply <= 20) return 0.85;
   return 1;
 }
 
-export function findSimilarDecisions(currentFingerprint, historicalGames = [], username, { minSimilarity = MIN_SIMILARITY, maxMatches = MAX_MATCHES } = {}) {
+export function findSimilarDecisions(currentFingerprint, historicalGames = [], username, { minSimilarity = MIN_SIMILARITY, maxMatches = MAX_MATCHES, currentMove = null, currentSan = null } = {}) {
   const current = decode(currentFingerprint);
   if (!current) return [];
 
@@ -132,6 +162,7 @@ export function findSimilarDecisions(currentFingerprint, historicalGames = [], u
       const similarity = structuralSimilarity(currentFingerprint, position.before);
       const adjusted = similarity * openingDiscount(position.ply);
       if (adjusted < minSimilarity) continue;
+      const decisionScore = decisionSimilarity(currentMove, currentSan, position.move, position.san);
       matches.push({
         gameUrl: game.url || null,
         gameId: game.url?.split('/').pop() || null,
@@ -142,12 +173,14 @@ export function findSimilarDecisions(currentFingerprint, historicalGames = [], u
         before: position.before,
         similarity,
         adjustedSimilarity: adjusted,
+        decisionSimilarity: decisionScore,
+        decisionAgreement: currentMove ? decisionScore >= 0.75 : null,
         result: game[color]?.result || null,
         endTime: game.end_time || null
       });
     }
   }
 
-  matches.sort((a, b) => b.adjustedSimilarity - a.adjustedSimilarity || a.ply - b.ply);
+  matches.sort((a, b) => (b.decisionSimilarity - a.decisionSimilarity) || (b.adjustedSimilarity - a.adjustedSimilarity) || a.ply - b.ply);
   return matches.slice(0, maxMatches);
 }

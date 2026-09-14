@@ -59,14 +59,14 @@ function changePointObservations(changePointAnalysis) {
 function similarPositionObservations(similarPositionAnalysis) {
   if (!similarPositionAnalysis || similarPositionAnalysis.status !== 'complete') return [];
   const matches = Array.isArray(similarPositionAnalysis.selected) ? similarPositionAnalysis.selected : [];
-  const strong = matches.filter(item => item.adjustedSimilarity >= 0.9);
+  const strong = matches.filter(item => item.adjustedSimilarity >= 0.9 && item.decisionSimilarity >= 0.75 && item.decisionAgreement);
   if (!strong.length) return [];
   const uniqueGames = new Set(strong.map(item => item.gameUrl || item.gameId).filter(Boolean));
   return [{
     source: 'similar-position',
     strength: strong.length >= 4 && uniqueGames.size >= 3 ? 'moderate' : 'low',
     kind: 'structurally-similar-decisions',
-    text: `${strong.length} structurally similar historical decision${strong.length === 1 ? '' : 's'} found across ${uniqueGames.size || strong.length} game${uniqueGames.size === 1 ? '' : 's'}.`
+    text: `${strong.length} structurally similar historical decision${strong.length === 1 ? '' : 's'} with analogous moves found across ${uniqueGames.size || strong.length} game${uniqueGames.size === 1 ? '' : 's'}.`
   }];
 }
 

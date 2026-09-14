@@ -119,8 +119,8 @@ async function requestReview(sendResponse) {
 
   let similarPositionAnalysis = { status: 'no-pgn', matches: [], selected: [] };
   if (currentGame?.pgn && criticalAnalysis?.selected?.length) {
-    const matches = criticalAnalysis.selected.flatMap(critical => findSimilarDecisions(critical.before, historyWindow, opponent, { maxMatches: 8 }).map(match => ({ currentPly: critical.ply, currentSan: critical.san, currentMoveNumber: critical.moveNumber, ...match })));
-    matches.sort((a, b) => b.adjustedSimilarity - a.adjustedSimilarity || a.currentPly - b.currentPly);
+    const matches = criticalAnalysis.selected.flatMap(critical => findSimilarDecisions(critical.before, historyWindow, opponent, { maxMatches: 8, currentMove: critical.move, currentSan: critical.san }).map(match => ({ currentPly: critical.ply, currentSan: critical.san, currentMoveNumber: critical.moveNumber, ...match })));
+    matches.sort((a, b) => (b.decisionSimilarity - a.decisionSimilarity) || (b.adjustedSimilarity - a.adjustedSimilarity) || a.currentPly - b.currentPly);
     similarPositionAnalysis = { status: matches.length ? 'complete' : 'no-matches', matches: matches.slice(0, 32), selected: matches.slice(0, 12), currentCriticalPositions: criticalAnalysis.selected.length };
   }
 
