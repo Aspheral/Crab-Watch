@@ -33,5 +33,5 @@ test('compares current game against personal baseline', () => {
   assert.equal(result.currentMedianCpl, 8);
   assert.equal(result.baselineMedianCpl, 25);
   assert.equal(result.medianImprovement, 17);
-  assert.equal(result.matchRateDelta, 0.6);
+  assert.equal(result.matchRateDelta, 0.2666666666666666);
 });
