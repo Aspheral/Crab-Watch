@@ -48,7 +48,7 @@ The current history layer is deliberately descriptive. It does **not** claim tha
 
 ## API behavior
 
-The public Chess.com API is read-only. Crab Watch uses serial archive requests rather than parallel bursts and caches the resulting history locally. Chess.com documents that its public API responses may be cached for up to 12 hours and that parallel request bursts can trigger rate limiting, so the collector deliberately follows that model. citeturn0search0
+The public Chess.com API is read-only. Crab Watch uses serial archive requests rather than parallel bursts and caches the resulting history locally. The collector is intentionally conservative about request volume and reuses cached history.
 
 ## Important limitation
 
