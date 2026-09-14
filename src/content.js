@@ -62,14 +62,14 @@
         node.getAttribute?.('title'),
       ].filter(Boolean).join(' ').toLowerCase();
       const classText = String(node.className || '').toLowerCase();
-      const ancestorText = node.closest?.('header, nav, footer, [class*="sidebar"], [class*="account"], [class*="profile"], [class*="user-menu"]') ? 'scoped' : '';
+      const scopedAncestor = node.closest?.('header, nav, footer, [class*="sidebar"], [class*="account"], [class*="profile"], [class*="user-menu"]');
 
       if (explicitUsername) score += 100;
       if (node.getAttribute?.('aria-current') === 'page' || node.getAttribute?.('aria-current') === 'true') score += 60;
       if (/account|current.?user|user.?menu|profile.?menu/.test(attrText)) score += 45;
       if (/account|current.?user|user.?menu|profile.?menu/.test(classText)) score += 35;
       if (/settings|preferences|my profile|your profile|my account/.test(attrText)) score += 30;
-      if (ancestorText) score += 15;
+      if (scopedAncestor) score += 15;
       if (/^\/member\//i.test(node.getAttribute?.('href') || '') && node.closest?.('header, nav, footer')) score += 10;
 
       candidates.push({ username: playerKeys.get(username.toLowerCase()), score });
@@ -77,7 +77,7 @@
 
     candidates.sort((a, b) => b.score - a.score);
     const best = candidates[0];
-    if (best && best.score >= 40) return best.username;
+    if (best && best.score >= 15) return best.username;
 
     return null;
   }
