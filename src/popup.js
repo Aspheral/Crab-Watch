@@ -54,6 +54,8 @@ function renderEvidence(evidence) {
     ['History', evidence.signals.accountHistory],
     ['Strength', evidence.signals.historicalStrength],
     ['Critical positions', evidence.signals.positionDifficulty],
+    ['Engine', evidence.signals.moveQuality],
+    ['Personal baseline', evidence.signals.humanErrorProfile],
     ['Timing', evidence.signals.timing],
     ['Repeated play', evidence.signals.repeatedDecision]
   ];
@@ -67,7 +69,9 @@ function renderEvidence(evidence) {
       ? 'context found'
       : signal?.status === 'no-data'
         ? 'no clock data'
-        : 'no finding';
+        : signal?.status === 'no-baseline'
+          ? 'not enough history'
+          : 'no finding';
     row.append(left, right);
     signals.appendChild(row);
   }
