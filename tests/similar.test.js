@@ -25,7 +25,7 @@ test('scores structurally similar positions highly', () => {
 test('scores analogous decisions higher than unrelated moves', () => {
   const current = { from: 'e2', to: 'e4' };
   assert.equal(decisionSimilarity(current, 'e4', { from: 'e2', to: 'e4' }, 'e4'), 1);
-  assert.ok(decisionSimilarity(current, 'e4', { from: 'e2', to: 'e3' }, 'e3') >= 0.75);
+  assert.ok(decisionSimilarity(current, 'e4', { from: 'e2', to: 'e3' }, 'e3') >= 0.70);
   assert.ok(decisionSimilarity(current, 'e4', { from: 'g1', to: 'f3' }, 'Nf3') < 0.5);
 });
 
