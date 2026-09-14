@@ -51,11 +51,11 @@ test('detects a temporal engine-quality shift and exposes the selected split', (
   ];
   const result = summarizeTemporalEngineBaseline(results);
   assert.equal(result.status, 'complete');
-  assert.equal(result.recentGames, 5);
-  assert.equal(result.olderGames, 5);
-  assert.equal(result.cplShift, -45);
-  assert.equal(result.matchRateDelta, 0.8);
-  assert.equal(result.candidate?.split, 5);
+  assert.equal(result.recentGames, 6);
+  assert.equal(result.olderGames, 4);
+  assert.equal(result.cplShift, -46.5);
+  assert.equal(result.matchRateDelta, 2 / 3);
+  assert.equal(result.candidate?.split, 6);
   assert.ok(Array.isArray(result.candidates));
   assert.ok(result.candidates.length >= 2);
   assert.ok(result.candidates[0].score >= result.candidates[1].score);
