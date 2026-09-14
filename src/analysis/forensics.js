@@ -11,6 +11,7 @@ export const SIGNALS = Object.freeze([
 ]);
 
 const LEVELS = Object.freeze({ none: 0, low: 1, moderate: 2, high: 3 });
+const MIN_ENGINE_AGREEMENT_POSITIONS = 4;
 
 function evidenceFromHistory(observations = []) {
   return observations.map(observation => ({ source: 'history', strength: observation.strength, kind: observation.kind, text: observation.text }));
@@ -31,7 +32,7 @@ function engineObservations(engineAnalysis) {
   const losses = results.map(item => item.centipawnLoss).filter(Number.isFinite);
   const matches = results.filter(item => item.bestMoveMatches).length;
   const meanLoss = losses.length ? losses.reduce((a, b) => a + b, 0) / losses.length : null;
-  if (matches && matches / Math.max(1, results.length) >= 0.75) observations.push({ source: 'engine', strength: 'moderate', kind: 'critical-engine-agreement', text: `${matches} of ${results.length} selected critical decisions matched the engine's top move at the sampled depth.` });
+  if (matches && results.length >= MIN_ENGINE_AGREEMENT_POSITIONS && matches / results.length >= 0.75) observations.push({ source: 'engine', strength: 'moderate', kind: 'critical-engine-agreement', text: `${matches} of ${results.length} selected critical decisions matched the engine's top move at the sampled depth.` });
   if (meanLoss !== null && meanLoss <= 12 && losses.length >= 4) observations.push({ source: 'engine', strength: 'low', kind: 'low-critical-cpl', text: `Selected critical positions averaged about ${Math.round(meanLoss)} centipawns of loss.` });
   return observations;
 }
