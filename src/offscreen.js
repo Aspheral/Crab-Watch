@@ -1,3 +1,5 @@
+import { movesMatch } from './analysis/engine.js';
+
 const ENGINE_NAME = 'Stockfish 18 lite single-threaded';
 let engineWorker = null;
 let engineReady = null;
@@ -142,7 +144,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           playedScoreCp: playedCp,
           centipawnLoss,
           depth: Math.min(before.depth || 0, after.depth || 0),
-          bestMoveMatches: String(playedMove || '').toLowerCase() === String(before.bestMove || '').toLowerCase()
+          bestMoveMatches: movesMatch(playedMove, before.bestMove)
         });
       }
       sendResponse({ ok: true, result: { status: 'complete', engine: ENGINE_NAME, depth: message.depth, results } });
