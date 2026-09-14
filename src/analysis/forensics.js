@@ -36,7 +36,20 @@ function engineObservations(engineAnalysis) {
   return observations;
 }
 
-export function createEvidenceReport({ game, history = [], player = null, historyAnalysis = null, criticalAnalysis = null, timingAnalysis = null, engineAnalysis = null }) {
+function baselineObservations(engineBaseline) {
+  const comparison = engineBaseline?.comparison;
+  if (!comparison || comparison.status !== 'complete') return [];
+  const observations = [];
+  if (comparison.baselineMedianCpl !== null && comparison.currentMedianCpl !== null && comparison.currentMedianCpl <= comparison.baselineMedianCpl * 0.45) {
+    observations.push({ source: 'personal-baseline', strength: 'moderate', kind: 'historical-engine-improvement', text: `The selected critical decisions had a median engine loss of about ${Math.round(comparison.currentMedianCpl)} cp versus about ${Math.round(comparison.baselineMedianCpl)} cp in the sampled historical baseline.` });
+  }
+  if (comparison.baselineMatchRate !== null && comparison.currentMatchRate !== null && comparison.matchRateDelta >= 0.35) {
+    observations.push({ source: 'personal-baseline', strength: 'moderate', kind: 'historical-top-move-improvement', text: `Top-move agreement was about ${Math.round(comparison.currentMatchRate * 100)}% in this game versus ${Math.round(comparison.baselineMatchRate * 100)}% in the sampled historical baseline.` });
+  }
+  return observations;
+}
+
+export function createEvidenceReport({ game, history = [], player = null, historyAnalysis = null, criticalAnalysis = null, timingAnalysis = null, engineAnalysis = null, engineBaseline = null }) {
   if (!game?.finished) throw new Error('Crab Watch only accepts completed games.');
   const signals = SIGNALS.reduce((out, key) => { out[key] = { status: 'not-run', observations: [] }; return out; }, {});
   signals.accountHistory = { status: 'complete', observations: evidenceFromHistory(historyAnalysis?.observations || []) };
@@ -63,8 +76,19 @@ export function createEvidenceReport({ game, history = [], player = null, histor
   };
   signals.timing = { status: timingAnalysis?.status === 'complete' ? 'complete' : timingAnalysis ? 'no-data' : 'not-run', observations: timingObservations(timingAnalysis) };
   signals.moveQuality = { status: engineAnalysis?.status === 'complete' ? 'complete' : engineAnalysis ? engineAnalysis.status : 'not-run', observations: engineObservations(engineAnalysis) };
+  signals.humanErrorProfile = { status: engineBaseline?.comparison?.status === 'complete' ? 'complete' : engineBaseline ? 'no-baseline' : 'not-run', observations: baselineObservations(engineBaseline) };
 
-  return { version: 6, player, sample: { currentGame: game, historyGames: history.length }, critical: criticalAnalysis || { status: 'not-run' }, timing: timingAnalysis || { status: 'not-run' }, engine: engineAnalysis || { status: 'not-run' }, signals, assessment: classifyAssessment({ signals }) };
+  return {
+    version: 7,
+    player,
+    sample: { currentGame: game, historyGames: history.length },
+    critical: criticalAnalysis || { status: 'not-run' },
+    timing: timingAnalysis || { status: 'not-run' },
+    engine: engineAnalysis || { status: 'not-run' },
+    personalBaseline: engineBaseline || { status: 'not-run' },
+    signals,
+    assessment: classifyAssessment({ signals })
+  };
 }
 
 export function classifyAssessment(report) {
