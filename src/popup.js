@@ -54,6 +54,7 @@ function renderEvidence(evidence) {
     ['History', evidence.signals.accountHistory],
     ['Strength', evidence.signals.historicalStrength],
     ['Critical positions', evidence.signals.positionDifficulty],
+    ['Timing', evidence.signals.timing],
     ['Repeated play', evidence.signals.repeatedDecision]
   ];
   for (const [label, signal] of rows) {
@@ -62,7 +63,11 @@ function renderEvidence(evidence) {
     const left = document.createElement('span');
     left.textContent = label;
     const right = document.createElement('span');
-    right.textContent = signal?.observations?.length ? 'context found' : 'no finding';
+    right.textContent = signal?.observations?.length
+      ? 'context found'
+      : signal?.status === 'no-data'
+        ? 'no clock data'
+        : 'no finding';
     row.append(left, right);
     signals.appendChild(row);
   }
