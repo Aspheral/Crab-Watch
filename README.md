@@ -13,7 +13,7 @@ The goal is not to provide another engine-accuracy meter. Crab Watch examines a 
 - **Quiet UI.** The interface uses clean cards, restrained typography, useful visual summaries, and no fake telemetry or sci-fi dashboard language.
 - **Account size is context, not immunity.** A 351+ game history is retained as account-context evidence, not used as an innocence cutoff.
 
-## Current state: 0.5.0
+## Current state: 0.6.0
 
 The extension now has a working post-game data path:
 
@@ -27,10 +27,11 @@ The extension now has a working post-game data path:
 8. Reconstruct standard chess positions from PGN and fingerprint exact positions.
 9. Look for recurring position-and-move decisions across the recent history.
 10. Scan the completed game for **critical decision points**, using tactical forcing moves, material swings, king pressure, branching/mobility, and pawn tension to prioritize positions for deeper analysis.
-11. Build a descriptive historical-behavior report covering rating context, result profile, account span, repeated opening behavior, exact repeated-position decisions, and critical-position findings.
-12. Store the evidence report for the next analysis layer.
+11. Extract post-game **clock annotations** when the PGN provides them, measuring move-time distributions, fast-response shares, and compressed think-time patterns without inventing timing evidence when clocks are absent.
+12. Build a descriptive historical-behavior report covering rating context, result profile, account span, repeated opening behavior, exact repeated-position decisions, critical-position findings, and available timing signals.
+13. Store the evidence report for the next analysis layer.
 
-The current history and critical-position layers are deliberately descriptive. They do **not** claim that repeated opening moves, long account histories, rating changes, a difficult position, or a single unusual game prove cheating.
+The current history, critical-position, and timing layers are deliberately descriptive. They do **not** claim that repeated opening moves, long account histories, rating changes, a difficult position, fast moves, or a single unusual game prove cheating.
 
 ## Planned analysis layers
 
@@ -40,11 +41,10 @@ The current history and critical-position layers are deliberately descriptive. T
 4. Player-specific error signatures
 5. Historical strength modeling
 6. Change-point detection
-7. Move-time behavior analysis where reliable timing data exists
-8. Cross-game anomaly clustering
-9. Multi-engine / multi-depth agreement analysis
-10. Calibrated evidence fusion
-11. Human-readable review reports
+7. Cross-game anomaly clustering
+8. Multi-engine / multi-depth agreement analysis
+9. Calibrated evidence fusion
+10. Human-readable review reports
 
 ## API behavior
 
