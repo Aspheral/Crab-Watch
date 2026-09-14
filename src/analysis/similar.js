@@ -129,7 +129,9 @@ export function decisionSimilarity(currentMove, currentSan, historicalMove, hist
   const origin = currentMove.from === historicalMove.from ? 1 : 0;
   const destination = currentMove.to === historicalMove.to ? 1 : 0;
   const promotion = (currentMove.promotion || null) === (historicalMove.promotion || null) ? 1 : 0;
-  const geometry = currentGeometry.fileDelta === historicalGeometry.fileDelta && currentGeometry.rankDelta === historicalGeometry.rankDelta ? 1 : currentGeometry.distance === historicalGeometry.distance ? 0.65 : 0;
+  const sameVector = currentGeometry.fileDelta === historicalGeometry.fileDelta && currentGeometry.rankDelta === historicalGeometry.rankDelta;
+  const sameDirection = Math.sign(currentGeometry.fileDelta) === Math.sign(historicalGeometry.fileDelta) && Math.sign(currentGeometry.rankDelta) === Math.sign(historicalGeometry.rankDelta);
+  const geometry = sameVector ? 1 : sameDirection && currentGeometry.distance === historicalGeometry.distance ? 0.65 : sameDirection ? 0.5 : currentGeometry.distance === historicalGeometry.distance ? 0.25 : 0;
   const currentCapture = /x/.test(String(currentSan || ''));
   const historicalCapture = /x/.test(String(historicalSan || ''));
   const capture = currentCapture === historicalCapture ? 1 : 0;
