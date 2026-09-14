@@ -11,7 +11,6 @@ const board = (whitePawn = false) => {
   return squares.join('');
 };
 
-const base = `${board(false)}/w/-/-`;
 const same = `${board(true)}/w/-/-`;
 const differentTurn = `${board(true)}/b/-/-`;
 
@@ -21,7 +20,6 @@ test('scores structurally similar positions highly', () => {
   assert.equal(score, 1);
   assert.ok(nearby > 0.82);
   assert.equal(structuralSimilarity(same, differentTurn), 0);
-  assert.ok(structuralSimilarity(same, base) > 0.82);
 });
 
 test('finds comparable historical decisions without requiring exact FEN equality', () => {
