@@ -4,9 +4,9 @@ import { createEvidenceReport } from '../src/analysis/forensics.js';
 
 const finishedGame = { finished: true, pgn: '1. e4 e5' };
 
-function engineResults(count, bestMoveMatches = true) {
+function engineResults(count, bestMoveMatches = true, startingCpl = 30) {
   return Array.from({ length: count }, (_, index) => ({
-    centipawnLoss: 2 + index,
+    centipawnLoss: startingCpl + index,
     bestMoveMatches
   }));
 }
