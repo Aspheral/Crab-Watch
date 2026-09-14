@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Crab Watch",
+  "version": "0.1.0",
+  "description": "Post-game chess forensics for Chess.com. No live analysis.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://www.chess.com/*", "https://api.chess.com/*"],
+  "action": {
+    "default_title": "Crab Watch",
+    "default_popup": "popup.html"
+  },
+  "icons": {
+    "16": "assets/crab.svg",
+    "32": "assets/crab.svg",
+    "48": "assets/crab.svg",
+    "128": "assets/crab.svg"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.chess.com/*"],
+      "js": ["src/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  }
+}
