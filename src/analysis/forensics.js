@@ -18,7 +18,7 @@ function evidenceFromHistory(observations = []) {
   return observations.map(observation => ({ source: 'history', strength: observation.strength, kind: observation.kind, text: observation.text }));
 }
 
-export function createEvidenceReport({ game, history = [], player = null, historyAnalysis = null }) {
+export function createEvidenceReport({ game, history = [], player = null, historyAnalysis = null, criticalAnalysis = null }) {
   if (!game?.finished) throw new Error('Crab Watch only accepts completed games.');
   const signals = SIGNALS.reduce((out, key) => {
     out[key] = { status: 'not-run', observations: [] };
@@ -39,10 +39,36 @@ export function createEvidenceReport({ game, history = [], player = null, histor
       : []
   };
 
+  const selectedCritical = criticalAnalysis?.selected || [];
+  signals.positionDifficulty = {
+    status: criticalAnalysis ? 'complete' : 'not-run',
+    observations: selectedCritical.length
+      ? [{
+          source: 'position-model',
+          strength: selectedCritical.some(item => item.classification === 'critical') ? 'moderate' : 'low',
+          kind: 'critical-position-scan',
+          text: `${selectedCritical.length} decision points were selected for deeper post-game analysis.`
+        }]
+      : []
+  };
+  signals.criticalDecision = {
+    status: criticalAnalysis ? 'complete' : 'not-run',
+    observations: selectedCritical
+      .filter(item => item.classification === 'critical')
+      .slice(0, 8)
+      .map(item => ({
+        source: 'position-model',
+        strength: 'moderate',
+        kind: 'critical-decision',
+        text: `${item.san} on move ${item.moveNumber} was flagged as a high-difficulty decision (${item.difficulty}/100): ${item.reasons.join(', ')}.`
+      }))
+  };
+
   return {
-    version: 3,
+    version: 4,
     player,
     sample: { currentGame: game, historyGames: history.length },
+    critical: criticalAnalysis || { status: 'not-run' },
     signals,
     assessment: classifyAssessment({ signals })
   };
