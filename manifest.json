@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Crab Watch",
   "short_name": "Crab Watch",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Post-game chess forensics for Chess.com. No live analysis.",
   "permissions": ["storage", "offscreen"],
   "host_permissions": ["https://www.chess.com/*", "https://api.chess.com/*"],
