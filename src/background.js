@@ -3,13 +3,17 @@ import { compareCurrentGameToHistory } from './analysis/history.js';
 import { detectCriticalPositions } from './analysis/critical.js';
 import { analyzeTiming } from './analysis/timing.js';
 import { analyzeWithEngine } from './analysis/engine.js';
+import { buildEngineBaseline, compareCurrentToBaseline } from './analysis/baseline.js';
 import { createEvidenceReport } from './analysis/forensics.js';
 
 const GAME_STATE_KEY = 'crabWatchGameState';
 const REVIEW_KEY = 'crabWatchReview';
 const CACHE_KEY_PREFIX = 'crabWatchHistory:';
+const BASELINE_CACHE_PREFIX = 'crabWatchEngineBaseline:';
 const OFFSCREEN_PATH = 'offscreen.html';
-const VERSION = '0.7.0';
+const HISTORY_CACHE_MS = 12 * 60 * 60 * 1000;
+const BASELINE_CACHE_MS = 7 * 24 * 60 * 60 * 1000;
+const VERSION = '0.8.0';
 
 async function setCrabIcon() {
   try {
@@ -48,10 +52,29 @@ async function cachedHistory(username) {
   const key = `${CACHE_KEY_PREFIX}${username.toLowerCase()}`;
   const stored = await chrome.storage.local.get(key);
   const cached = stored[key];
-  if (cached?.fetchedAt && Date.now() - cached.fetchedAt < 12 * 60 * 60 * 1000) return { ...cached, fromCache: true };
+  if (cached?.fetchedAt && Date.now() - cached.fetchedAt < HISTORY_CACHE_MS) return { ...cached, fromCache: true };
   const result = await getRecentGames(username, ACCOUNT_CONTEXT_WINDOW);
   await chrome.storage.local.set({ [key]: result });
   return { ...result, fromCache: false };
+}
+
+async function cachedEngineBaseline(username, historyGames, currentGameUrl) {
+  const key = `${BASELINE_CACHE_PREFIX}${username.toLowerCase()}`;
+  const stored = await chrome.storage.local.get(key);
+  const cached = stored[key];
+  if (cached?.createdAt && Date.now() - cached.createdAt < BASELINE_CACHE_MS && cached?.status === 'complete') {
+    return { ...cached, fromCache: true };
+  }
+
+  const result = await buildEngineBaseline({
+    games: historyGames,
+    username,
+    currentGameUrl,
+    analyzePositions: positions => runEnginePositions(positions, 12, 6)
+  });
+  const value = { ...result, createdAt: Date.now(), fromCache: false };
+  await chrome.storage.local.set({ [key]: value });
+  return value;
 }
 
 function findCurrentGame(history, state) {
@@ -81,15 +104,18 @@ async function ensureOffscreenDocument() {
   });
 }
 
+async function runEnginePositions(positions, depth = 15, maxPositions = 8) {
+  if (!positions?.length) return { status: 'no-positions', results: [] };
+  await ensureOffscreenDocument();
+  return analyzeWithEngine({ positions, depth, maxPositions });
+}
+
 async function runEngine(criticalAnalysis) {
   if (!criticalAnalysis?.selected?.length) return { status: 'no-positions', results: [] };
   try {
-    await ensureOffscreenDocument();
-    const result = await analyzeWithEngine({ positions: criticalAnalysis.selected, depth: 15, maxPositions: 8 });
-    await chrome.offscreen.closeDocument();
+    const result = await runEnginePositions(criticalAnalysis.selected, 15, 8);
     return result;
   } catch (error) {
-    try { await chrome.offscreen.closeDocument(); } catch {}
     return { status: 'unavailable', engine: 'Stockfish 18 lite single-threaded', results: [], error: error.message };
   }
 }
@@ -108,7 +134,24 @@ async function requestReview(sendResponse) {
   const opponentColor = colorForPlayer(currentGame, opponent);
   const criticalAnalysis = currentGame?.pgn ? await detectCriticalPositions(currentGame.pgn, opponentColor, 12) : null;
   const timingAnalysis = currentGame?.pgn ? analyzeTiming(currentGame.pgn, opponentColor) : null;
-  const engineAnalysis = currentGame?.pgn && criticalAnalysis ? await runEngine(criticalAnalysis) : { status: 'no-pgn', results: [] };
+
+  let engineAnalysis = { status: 'no-pgn', results: [] };
+  let engineBaseline = { status: 'no-pgn', comparison: { status: 'insufficient' } };
+  if (currentGame?.pgn && criticalAnalysis) {
+    try {
+      await ensureOffscreenDocument();
+      engineAnalysis = await analyzeWithEngine({ positions: criticalAnalysis.selected, depth: 15, maxPositions: 8 });
+      if (engineAnalysis.status === 'complete') {
+        const baselineRaw = await cachedEngineBaseline(opponent, games.slice(0, HISTORY_WINDOW), currentGame.url || state.url || null);
+        engineBaseline = { ...baselineRaw, comparison: compareCurrentToBaseline(engineAnalysis, baselineRaw) };
+      }
+    } catch (error) {
+      engineAnalysis = { status: 'unavailable', engine: 'Stockfish 18 lite single-threaded', results: [], error: error.message };
+    } finally {
+      try { await chrome.offscreen.closeDocument(); } catch {}
+    }
+  }
+
   const evidence = createEvidenceReport({
     game: { ...currentGame, finished: true },
     history: games.slice(0, HISTORY_WINDOW),
@@ -116,7 +159,8 @@ async function requestReview(sendResponse) {
     historyAnalysis,
     criticalAnalysis,
     timingAnalysis,
-    engineAnalysis
+    engineAnalysis,
+    engineBaseline
   });
 
   const review = {
@@ -133,8 +177,9 @@ async function requestReview(sendResponse) {
     criticalAnalysis,
     timingAnalysis,
     engineAnalysis,
+    engineBaseline,
     evidence,
-    analysis: { engine: engineAnalysis.engine || 'Stockfish 18 lite single-threaded', status: engineAnalysis.status === 'complete' ? 'engine-complete' : 'engine-unavailable' },
+    analysis: { engine: engineAnalysis.engine || 'Stockfish 18 lite single-threaded', status: evidence.assessment.level },
     readyForAnalysisAt: Date.now()
   };
   await chrome.storage.local.set({ [REVIEW_KEY]: review });
@@ -155,7 +200,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 chrome.runtime.onInstalled.addListener(async () => {
-  await chrome.storage.local.set({ crabWatchVersion: VERSION, analysisPolicy: 'post-game-only', historyWindow: HISTORY_WINDOW, accountContextWindow: ACCOUNT_CONTEXT_WINDOW });
+  await chrome.storage.local.set({ crabWatchVersion: VERSION, analysisPolicy: 'post-game-only', historyWindow: HISTORY_WINDOW, accountContextWindow: ACCOUNT_CONTEXT_WINDOW, engineBaselineGames: 6 });
   await setCrabIcon();
 });
 
