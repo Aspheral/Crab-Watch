@@ -28,8 +28,7 @@ function pathClear(board, from, to) {
   let f = ff + df, r = fr + dr;
   while (f !== tf || r !== tr) {
     if (board[(8 - r) * 8 + f]) return false;
-    f += df;
-    r += dr;
+    f += df; r += dr;
   }
   return true;
 }
@@ -134,13 +133,6 @@ function material(board, color) {
   return board.reduce((sum, piece) => piece && colorOf(piece) === color ? sum + (PIECE_VALUES[typeOf(piece)] || 0) : sum, 0);
 }
 
-function pieceCounts(board) {
-  return board.reduce((counts, piece) => {
-    if (piece) counts[typeOf(piece)] = (counts[typeOf(piece)] || 0) + 1;
-    return counts;
-  }, {});
-}
-
 function adjacentPawnTension(board) {
   let tension = 0;
   for (let i = 0; i < board.length; i += 1) {
@@ -162,9 +154,7 @@ function moveFlags(san) {
     capture: /x/.test(san),
     check: /[+#]$/.test(san),
     promotion: /=/.test(san),
-    castle: /^(O-O|O-O-O|0-0|0-0-0)/.test(san),
-    pawnMove: /^[a-h]/.test(san),
-    forcing: /[+#=x]/.test(san)
+    castle: /^(O-O|O-O-O|0-0|0-0-0)/.test(san)
   };
 }
 
@@ -213,41 +203,39 @@ function scoreFeatures({ before, after, san, ply }) {
   };
 }
 
-export function detectCriticalPositions(pgn = '', focusColor = null, limit = 12) {
-  // Lazy import avoids a dependency cycle with the position reconstruction module.
-  // This file is loaded only after a game is complete.
-  return import('./chess-position.js').then(({ positionFingerprints }) => {
-    const fingerprints = positionFingerprints(pgn);
-    const scored = [];
-    for (const item of fingerprints) {
-      if (focusColor && (item.ply % 2 === 1 ? 'w' : 'b') !== focusColor) continue;
-      const before = decodeKey(item.before);
-      const after = decodeKey(item.after);
-      if (!before || !after) continue;
-      const features = scoreFeatures({ before, after, san: item.san, ply: item.ply });
-      scored.push({
-        ply: item.ply,
-        moveNumber: Math.ceil(item.ply / 2),
-        san: item.san,
-        before: item.before,
-        after: item.after,
-        ...features
-      });
-    }
-    scored.sort((a, b) => b.difficulty - a.difficulty || a.ply - b.ply);
+export async function detectCriticalPositions(pgn = '', focusColor = null, limit = 12) {
+  const { positionFingerprints } = await import('./chess-position.js');
+  const fingerprints = positionFingerprints(pgn);
+  const scored = [];
+  for (const item of fingerprints) {
+    if (focusColor && (item.ply % 2 === 1 ? 'w' : 'b') !== focusColor) continue;
+    const before = decodeKey(item.before);
+    const after = decodeKey(item.after);
+    if (!before || !after) continue;
+    const features = scoreFeatures({ before, after, san: item.san, ply: item.ply });
+    scored.push({
+      ply: item.ply,
+      moveNumber: Math.ceil(item.ply / 2),
+      san: item.san,
+      move: item.move,
+      before: item.before,
+      after: item.after,
+      ...features
+    });
+  }
+  scored.sort((a, b) => b.difficulty - a.difficulty || a.ply - b.ply);
 
-    const selected = [];
-    for (const item of scored) {
-      const tooClose = selected.some(existing => Math.abs(existing.ply - item.ply) <= 2);
-      if (tooClose) continue;
-      selected.push(item);
-      if (selected.length >= limit) break;
-    }
-    return {
-      analyzedPlies: fingerprints.length,
-      focusColor,
-      candidates: scored,
-      selected
-    };
-  });
+  const selected = [];
+  for (const item of scored) {
+    const tooClose = selected.some(existing => Math.abs(existing.ply - item.ply) <= 2);
+    if (tooClose) continue;
+    selected.push(item);
+    if (selected.length >= limit) break;
+  }
+  return {
+    analyzedPlies: fingerprints.length,
+    focusColor,
+    candidates: scored,
+    selected
+  };
 }
