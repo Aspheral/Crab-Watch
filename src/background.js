@@ -1,9 +1,10 @@
 import { getRecentGames, validUsername, MAX_GAMES } from './chesscom-api.js';
+import { compareCurrentGameToHistory } from './analysis/history.js';
 
 const GAME_STATE_KEY = 'crabWatchGameState';
 const REVIEW_KEY = 'crabWatchReview';
 const CACHE_KEY_PREFIX = 'crabWatchHistory:';
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 
 async function setCrabIcon() {
   try {
@@ -26,8 +27,8 @@ async function setCrabIcon() {
 function opponentFor(game) {
   if (!Array.isArray(game?.players) || game.players.length < 2) return null;
   const current = game.currentUser?.toLowerCase();
-  const other = game.players.find(name => name.toLowerCase() !== current);
-  return other || null;
+  if (!current) return null;
+  return game.players.find(name => name.toLowerCase() !== current) || null;
 }
 
 async function cachedHistory(username) {
@@ -42,26 +43,49 @@ async function cachedHistory(username) {
   return { ...result, fromCache: false };
 }
 
+function findCurrentGame(history, state) {
+  const id = state?.gameId;
+  if (id) {
+    const byId = history.find(game => String(game.url || '').endsWith(`/${id}`));
+    if (byId) return byId;
+  }
+  const url = state?.url;
+  if (url) {
+    const normalized = url.replace(/\/$/, '');
+    const byUrl = history.find(game => String(game.url || '').replace(/\/$/, '') === normalized);
+    if (byUrl) return byUrl;
+  }
+  return state?.embeddedPgn ? { pgn: state.embeddedPgn } : null;
+}
+
 async function requestReview(sendResponse) {
   const stored = await chrome.storage.local.get(GAME_STATE_KEY);
-  const game = stored[GAME_STATE_KEY];
-  if (!game?.finished) throw new Error('No completed game is available.');
+  const state = stored[GAME_STATE_KEY];
+  if (!state?.finished) throw new Error('No completed game is available.');
 
-  const opponent = opponentFor(game);
+  const opponent = opponentFor(state);
   if (!validUsername(opponent)) {
     throw new Error('Crab Watch could not identify the opponent from the completed game.');
   }
 
   const history = await cachedHistory(opponent);
+  const currentGame = findCurrentGame(history.games || [], state);
+  const comparison = compareCurrentGameToHistory(opponent, currentGame || state, history.games || []);
+
   const review = {
     version: VERSION,
-    completedGame: game,
+    completedGame: currentGame || state,
     opponent,
     history: history.games || [],
     player: history.player || null,
     historyCount: history.games?.length || 0,
     historyFetchedAt: history.fetchedAt,
     fromCache: history.fromCache,
+    historyAnalysis: comparison,
+    analysis: {
+      engine: 'not-run',
+      status: 'history-context-ready'
+    },
     readyForAnalysisAt: Date.now()
   };
 
