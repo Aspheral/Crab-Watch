@@ -40,11 +40,12 @@ function isComputerGame(game) {
 }
 
 function opponentFor(game) {
-  if (game?.opponent) return game.opponent;
-  if (!Array.isArray(game?.players) || game.players.length < 2) return null;
+  if (validUsername(game?.opponent)) return game.opponent;
+  if (!Array.isArray(game?.players) || !game.players.length) return null;
   const current = game.currentUser?.toLowerCase();
-  if (!current) return null;
-  return game.players.find(name => name.toLowerCase() !== current) || null;
+  if (current) return game.players.find(name => name.toLowerCase() !== current) || null;
+  if (game.players.length === 1 && validUsername(game.players[0])) return game.players[0];
+  return null;
 }
 
 function colorForPlayer(game, username) {
