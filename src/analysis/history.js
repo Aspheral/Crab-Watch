@@ -1,0 +1,161 @@
+const RESULT_BY_SIDE = {
+  '1-0': { white: 1, black: 0 },
+  '0-1': { white: 0, black: 1 },
+  '1/2-1/2': { white: 0.5, black: 0.5 }
+};
+
+function pgnMoves(pgn = '') {
+  const body = pgn.replace(/\[[^\]]*\]/g, ' ').replace(/\{[^}]*\}/g, ' ').replace(/\([^)]*\)/g, ' ');
+  return body
+    .replace(/1-0|0-1|1\/2-1\/2|\*/g, ' ')
+    .split(/\s+/)
+    .map(token => token.replace(/^\d+\.(\.\.)?/, ''))
+    .map(token => token.replace(/^\.+/, '').trim())
+    .filter(token => token && !/^\d+$/.test(token) && !/^\$\d+$/.test(token));
+}
+
+function gameFor(username, game) {
+  const lower = username.toLowerCase();
+  const white = game?.white?.username?.toLowerCase();
+  const black = game?.black?.username?.toLowerCase();
+  return white === lower ? 'white' : black === lower ? 'black' : null;
+}
+
+function median(values) {
+  const clean = values.filter(Number.isFinite).sort((a, b) => a - b);
+  if (!clean.length) return null;
+  const mid = Math.floor(clean.length / 2);
+  return clean.length % 2 ? clean[mid] : (clean[mid - 1] + clean[mid]) / 2;
+}
+
+function exactOpeningPatterns(games, username, plies = 12) {
+  const positions = Array.from({ length: plies }, () => new Map());
+  let usable = 0;
+  for (const game of games) {
+    const side = gameFor(username, game);
+    if (!side || !game?.pgn) continue;
+    const moves = pgnMoves(game.pgn);
+    if (!moves.length) continue;
+    usable += 1;
+    for (let ply = 0; ply < Math.min(plies, moves.length); ply += 1) {
+      const move = moves[ply];
+      const map = positions[ply];
+      map.set(move, (map.get(move) || 0) + 1);
+    }
+  }
+  return positions.map(map => {
+    let top = null;
+    for (const [move, count] of map) if (!top || count > top.count) top = { move, count };
+    return top ? { ...top, share: usable ? top.count / usable : 0 } : null;
+  });
+}
+
+export function analyzeAccountHistory(username, games) {
+  const recent = Array.isArray(games) ? games.slice(0, 300) : [];
+  const ratings = [];
+  const results = { wins: 0, losses: 0, draws: 0 };
+  const performance = [];
+  const dates = [];
+  let rated = 0;
+
+  for (const game of recent) {
+    const side = gameFor(username, game);
+    if (!side) continue;
+    const player = game[side];
+    if (Number.isFinite(Number(player?.rating))) ratings.push(Number(player.rating));
+    if (game.end_time) dates.push(Number(game.end_time));
+    if (game.rated !== false) rated += 1;
+
+    const result = RESULT_BY_SIDE[game.result];
+    if (result) {
+      const score = result[side];
+      if (score === 1) results.wins += 1;
+      else if (score === 0) results.losses += 1;
+      else results.draws += 1;
+      if (Number.isFinite(Number(player?.rating))) performance.push({ rating: Number(player.rating), score });
+    }
+  }
+
+  const chronological = [...recent].reverse();
+  const ratingSeries = chronological
+    .map(game => {
+      const side = gameFor(username, game);
+      const rating = Number(game?.[side]?.rating);
+      return Number.isFinite(rating) ? rating : null;
+    })
+    .filter(Boolean);
+
+  const firstRating = ratingSeries[0] ?? null;
+  const lastRating = ratingSeries.at(-1) ?? null;
+  const ratingDelta = firstRating !== null && lastRating !== null ? lastRating - firstRating : null;
+  const firstGameTime = dates.length ? Math.min(...dates) : null;
+  const lastGameTime = dates.length ? Math.max(...dates) : null;
+
+  return {
+    gameCount: recent.length,
+    ratedGames: rated,
+    results,
+    winRate: results.wins + results.losses + results.draws
+      ? results.wins / (results.wins + results.losses + results.draws)
+      : null,
+    medianRating: median(ratings),
+    firstRating,
+    lastRating,
+    ratingDelta,
+    firstGameTime,
+    lastGameTime,
+    accountSpanDays: firstGameTime && lastGameTime ? (lastGameTime - firstGameTime) / 86400 : null,
+    openingPatterns: exactOpeningPatterns(recent, username),
+    ratedSampleSize: performance.length
+  };
+}
+
+export function compareCurrentGameToHistory(username, currentGame, history) {
+  const side = gameFor(username, currentGame);
+  const currentRating = Number(currentGame?.[side]?.rating);
+  const currentMoves = pgnMoves(currentGame?.pgn || '');
+  const stats = analyzeAccountHistory(username, history);
+  const observations = [];
+
+  if (stats.gameCount >= 350) {
+    observations.push({
+      kind: 'large-history',
+      strength: 'context',
+      text: 'The account has a large public game history. Account longevity is contextual evidence, not an innocence guarantee.'
+    });
+  }
+
+  if (stats.ratingDelta !== null && Math.abs(stats.ratingDelta) >= 400) {
+    observations.push({
+      kind: 'rating-change',
+      strength: 'context',
+      text: `The sampled history spans a rating change of about ${Math.round(Math.abs(stats.ratingDelta))} points.`
+    });
+  }
+
+  if (currentRating && stats.medianRating) {
+    const deviation = currentRating - stats.medianRating;
+    if (Math.abs(deviation) >= 250) {
+      observations.push({
+        kind: 'rating-context',
+        strength: 'moderate',
+        text: `The current game's rating is notably different from the player's recent median.`
+      });
+    }
+  }
+
+  const meaningfulOpeningPatterns = stats.openingPatterns.filter(pattern => pattern?.share >= 0.85);
+  if (meaningfulOpeningPatterns.length >= 3) {
+    observations.push({
+      kind: 'repeated-opening',
+      strength: 'low',
+      text: 'The player repeatedly chooses the same early moves in much of the recent sample. Opening repetition is expected and is not treated as cheating evidence by itself.'
+    });
+  }
+
+  if (currentMoves.length < 4) {
+    observations.push({ kind: 'short-game', strength: 'context', text: 'The completed game is too short for a deep behavioral comparison.' });
+  }
+
+  return { stats, observations };
+}
