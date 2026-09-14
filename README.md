@@ -1,63 +1,167 @@
-# Crab Watch 🦀
+<div align="center">
+  <img src="assets/crab.svg" alt="Crab Watch crab logo" width="140" />
+  <h1>Crab Watch</h1>
+  <p><strong>Post-game chess forensics for Chess.com.</strong></p>
+  <p>Look at the game, then look at the history around it.</p>
+</div>
 
-Crab Watch is a Chrome extension for **post-game chess forensics** on Chess.com.
+---
 
-The goal is not to provide another engine-accuracy meter. Crab Watch examines a completed game in context: historical play, repeated decisions, position difficulty, timing behavior, strength changes, personal engine behavior, and other signals that may make a game statistically unusual.
+Crab Watch is a Chrome extension for reviewing completed Chess.com games in context. It looks beyond a single engine score and brings together recent game history, position difficulty, move timing, repeated decisions, historical strength, personal engine behavior, and other signals that can make a game worth a closer look.
 
-## Design principles
+It is deliberately a **review tool, not a verdict machine**. An unusual game is not automatically proof of outside assistance, and Crab Watch does not pretend that one metric can settle that question.
 
-- **Post-game only.** No chess analysis, evaluation, recommendations, or engine process is loaded during an active human-vs-human game.
-- **Evidence over verdicts.** An unusual game is not proof of outside assistance.
-- **History matters.** The opponent's recent public games form a baseline rather than treating every game in isolation.
-- **Human behavior matters.** Expected mistakes, position difficulty, time pressure, and player-specific patterns matter more than raw engine agreement alone.
-- **Quiet UI.** The interface uses clean cards, restrained typography, useful visual summaries, and no fake telemetry or sci-fi dashboard language.
-- **Account size is context, not immunity.** A 351+ game history is retained as account-context evidence, not used as an innocence cutoff.
+## What Crab Watch does
 
-## Current state: 0.8.0
+### 🦀 Post-game only
 
-The extension now has a working post-game analysis path:
+Crab Watch does not analyze positions, recommend moves, or run an engine while a human-vs-human game is in progress. The forensic review starts after the game is finished.
 
-1. Detect a completed Chess.com game.
-2. Capture visible game identity and move information without analyzing the position.
-3. Identify the opponent when the page exposes an unambiguous current-user identity.
-4. Collect up to **351 recent public games** through Chess.com's read-only PubAPI.
-5. Use the most recent **300 games** as the main behavioral-analysis window while retaining the extra account-context sample.
-6. Cache the history locally and reuse it for up to 12 hours.
-7. Match the completed game against the public archive when possible, falling back to captured PGN/move text when necessary.
-8. Reconstruct standard chess positions from PGN and fingerprint exact positions.
-9. Look for recurring position-and-move decisions across the recent history.
-10. Scan the completed game for **critical decision points**, using tactical forcing moves, material swings, king pressure, branching/mobility, and pawn tension to prioritize positions for deeper analysis.
-11. Extract post-game **clock annotations** when the PGN provides them, measuring move-time distributions, fast-response shares, and compressed think-time patterns without inventing timing evidence when clocks are absent.
-12. Run **Stockfish 18** only after game completion and only on selected critical positions.
-13. Sample up to **six spaced historical games** and score one critical decision from each to establish a cached personal engine baseline.
-14. Compare the current game's engine agreement and centipawn loss against that player's own sampled baseline, rather than treating a generic engine metric as the whole case.
-15. Build an evidence report separating account context, position difficulty, engine agreement, timing, repeated decisions, and the personal baseline.
-16. Keep calibrated cheating probabilities disabled until a labeled validation corpus exists.
+### 📚 Puts the game in context
 
-The current layers are deliberately conservative. They do **not** claim that repeated opening moves, long account histories, rating changes, a difficult position, fast moves, engine agreement, or a single personal-baseline improvement prove cheating.
+The review can use up to **351 recent public games** from Chess.com's read-only PubAPI. The newest **300 games** form the main behavioral window, while the additional games provide broader account context.
 
-## Engine architecture
+### ♟️ Looks for meaningful decisions
 
-Stockfish is run through a bundled browser worker in a Chrome MV3 offscreen document. The engine path is strictly post-game. The repository includes a reproducible vendor script so executable engine code is not fetched from a remote CDN at review time.
+The analysis reconstructs chess positions from PGN and can identify:
 
-The personal baseline is intentionally small rather than a 300-game engine sweep. Historical positions are spaced across the recent behavioral window, scored at a lower depth, and cached for up to seven days. A personal-baseline signal is only promoted into the evidence report when at least four historical games and four scored positions are available.
+- critical decision points
+- difficult or tactically sharp positions
+- exact repeated position-and-move decisions
+- similar decisions across earlier games
+- changes in playing patterns over time
+- move-timing patterns when clock data is available
 
-## Planned analysis layers
+### ⚙️ Uses Stockfish carefully
 
-1. Harden completed-game ingestion and PGN validation
-2. Similar-position matching beyond exact position equality
-3. Player-specific error signatures beyond engine agreement
-4. Historical strength modeling
-5. Change-point detection
-6. Cross-game anomaly clustering
-7. Multi-engine / multi-depth agreement analysis
-8. Calibrated evidence fusion
-9. Human-readable review reports
+Stockfish 18 is bundled with the extension and runs in a browser worker after the game is complete. It is used on selected critical positions rather than turning every historical game into a giant engine sweep.
+
+Crab Watch also builds a small personal engine baseline from recent games. That matters because a player's own normal performance is more useful context than comparing everyone against the same generic expectation.
+
+### 🔎 Keeps evidence separate
+
+The review keeps different signals distinct instead of flattening everything into one suspiciousness score. Engine agreement, timing, historical strength, repeated decisions, change points, position difficulty, and account context are treated as different pieces of evidence.
+
+There is intentionally **no fake cheating percentage**. A meaningful probability requires a properly labeled evaluation corpus containing both clean games and confirmed cases. Until that exists, Crab Watch reports evidence and uncertainty rather than inventing precision.
+
+## Current release
+
+**0.11.0 Beta**
+
+The current beta includes the post-game review pipeline, recent-history collection, PGN position reconstruction, critical-position selection, timing analysis, Stockfish 18 analysis, personal engine baselines, similar-position matching, change-point detection, and evidence fusion.
+
+The project is still being hardened. The goal is to make every signal more useful and more defensible before attempting any calibrated classification.
+
+## Install locally
+
+The easiest way to test the beta right now is to load the extension into Chrome as an unpacked extension.
+
+### 1. Get the source
+
+Open the repository on GitHub and choose **Code → Download ZIP**, then extract it somewhere convenient.
+
+> The normal GitHub source download is not the same thing as the finished Chrome Web Store package. The repository contains the source and build files. The release ZIP is produced by the packaging script after the bundled Stockfish files and store icons have been prepared.
+
+### 2. Build the extension package
+
+From the extracted project folder, open a terminal and run:
+
+```bash
+npm install
+npm run vendor:stockfish
+npm run package:extension
+```
+
+That produces:
+
+```text
+crab-watch-v0.11.0.zip
+```
+
+The packaging step also generates the Chrome extension PNG icons from the original `assets/crab.svg` artwork.
+
+### 3. Load it into Chrome
+
+For the quickest local smoke test, use the generated `dist/` folder rather than installing from the ZIP:
+
+1. Open `chrome://extensions`.
+2. Turn on **Developer mode**.
+3. Click **Load unpacked**.
+4. Select the project's `dist/` folder.
+5. Open the extension details and make sure Crab Watch is enabled.
+
+After changing source files, rerun the package command and use **Reload** on the extension in `chrome://extensions`.
+
+### 4. Run a real post-game test
+
+Play or open a game that has already finished on Chess.com. Then open Crab Watch and request the forensic review.
+
+A healthy local build should be able to:
+
+- recognize the completed game
+- identify the opponent
+- retrieve recent public history when available
+- reconstruct the completed game's positions
+- identify critical positions
+- read clock annotations when the PGN includes them
+- run the bundled Stockfish analysis after completion
+- show the personal baseline and history/context sections
+- save the completed review locally
+
+If a particular signal has no usable data, the extension should say so rather than manufacture a result.
+
+## For development
+
+Run the unit test suite with:
+
+```bash
+npm test
+```
+
+Run the release validation gate with:
+
+```bash
+npm run validate:release
+```
+
+Build the complete extension package with:
+
+```bash
+npm run package:extension
+```
+
+The repository's GitHub Actions workflow runs the tests, vendors Stockfish, validates the release files, builds the package, and checks that the expected engine and icon assets are present.
 
 ## API behavior
 
-The public Chess.com API is read-only. Crab Watch uses serial archive requests rather than parallel bursts and caches the resulting history locally. The collector is intentionally conservative about request volume and reuses cached history.
+Crab Watch uses Chess.com's public, read-only game data and caches collected history locally. Archive requests are made conservatively and reused for a period of time instead of hammering the API with parallel requests.
+
+## Design philosophy
+
+Crab Watch is intentionally quiet. No glowing fake telemetry, no giant "CHEATER DETECTED" badge, and no pretending that an engine line is a complete explanation of human behavior.
+
+The interesting part is the context around a move: what the position demanded, how the player normally behaves, how much time was available, what similar decisions looked like before, and whether the current game actually stands out from that baseline.
+
+## Roadmap
+
+The next areas of work are focused on making the analysis deeper without making it reckless:
+
+1. stronger completed-game ingestion and PGN validation
+2. richer similar-position matching
+3. player-specific error signatures
+4. stronger historical-strength modeling
+5. more robust change-point detection
+6. cross-game anomaly clustering
+7. multi-engine and multi-depth agreement
+8. calibrated evidence fusion once a trustworthy labeled corpus exists
+9. cleaner human-readable review reports
 
 ## Important limitation
 
-Crab Watch must not present an unsupported percentage as a factual probability of cheating. A calibrated probability requires a properly labeled evaluation dataset containing clean and confirmed-cheating examples. Until that exists, results should be presented as evidence-based anomaly assessments with uncertainty.
+Crab Watch does not and should not claim that a single game proves cheating. Fast moves, high engine agreement, repeated openings, rating changes, a large account history, or any other individual signal can have innocent explanations.
+
+The project's job is to make the evidence easier to inspect, not to turn uncertainty into a confident-looking number.
+
+## License
+
+See the repository for the current project license and dependency notices.
