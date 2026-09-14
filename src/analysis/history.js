@@ -1,23 +1,28 @@
 import { positionFingerprints } from './chess-position.js';
 
-const RESULT_BY_SIDE = {
-  '1-0': { white: 1, black: 0 },
-  '0-1': { white: 0, black: 1 },
-  '1/2-1/2': { white: 0.5, black: 0.5 }
-};
+function gameFor(username, game) {
+  const lower = username.toLowerCase();
+  const white = game?.white?.username?.toLowerCase();
+  const black = game?.black?.username?.toLowerCase();
+  return white === lower ? 'white' : black === lower ? 'black' : null;
+}
+
+function scoreFor(game, side) {
+  const direct = game?.[side]?.result;
+  if (direct === 'win') return 1;
+  if (direct === 'loss') return 0;
+  if (direct === 'agreed' || direct === 'repetition' || direct === 'stalemate' || direct === 'insufficient' || direct === '50move') return 0.5;
+  if (game?.result === '1-0') return side === 'white' ? 1 : 0;
+  if (game?.result === '0-1') return side === 'black' ? 1 : 0;
+  if (game?.result === '1/2-1/2') return 0.5;
+  return null;
+}
 
 function pgnMoves(pgn = '') {
   const body = pgn.replace(/\[[^\]]*\]/g, ' ').replace(/\{[^}]*\}/g, ' ').replace(/\([^)]*\)/g, ' ');
   return body.replace(/1-0|0-1|1\/2-1\/2|\*/g, ' ').split(/\s+/)
     .map(token => token.replace(/^\d+\.(\.\.)?/, '').replace(/^\.+/, '').trim())
     .filter(token => token && !/^\d+$/.test(token) && !/^\$\d+$/.test(token));
-}
-
-function gameFor(username, game) {
-  const lower = username.toLowerCase();
-  const white = game?.white?.username?.toLowerCase();
-  const black = game?.black?.username?.toLowerCase();
-  return white === lower ? 'white' : black === lower ? 'black' : null;
 }
 
 function median(values) {
@@ -107,14 +112,11 @@ export function analyzeAccountHistory(username, games) {
     if (Number.isFinite(Number(player?.rating))) ratings.push(Number(player.rating));
     if (game.end_time) dates.push(Number(game.end_time));
     if (game.rated !== false) rated += 1;
-    const result = RESULT_BY_SIDE[game.result];
-    if (result) {
-      const score = result[side];
-      if (score === 1) results.wins += 1;
-      else if (score === 0) results.losses += 1;
-      else results.draws += 1;
-      if (Number.isFinite(Number(player?.rating))) performance.push({ rating: Number(player.rating), score });
-    }
+    const score = scoreFor(game, side);
+    if (score === 1) results.wins += 1;
+    else if (score === 0) results.losses += 1;
+    else if (score === 0.5) results.draws += 1;
+    if (score !== null && Number.isFinite(Number(player?.rating))) performance.push({ rating: Number(player.rating), score });
   }
   const chronological = [...recent].reverse();
   const ratingSeries = chronological.map(game => {
