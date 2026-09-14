@@ -50,25 +50,50 @@ export function summarizeEngineBaseline(results = []) {
   return summarizeResults(results);
 }
 
+function temporalCandidate(ordered, split, minGames) {
+  const recent = ordered.slice(0, split);
+  const older = ordered.slice(split);
+  if (recent.length < minGames || older.length < minGames) return null;
+  const recentSummary = summarizeResults(recent);
+  const olderSummary = summarizeResults(older);
+  const cplShift = recentSummary.medianCpl !== null && olderSummary.medianCpl !== null
+    ? recentSummary.medianCpl - olderSummary.medianCpl
+    : null;
+  const matchRateDelta = recentSummary.topMoveMatchRate !== null && olderSummary.topMoveMatchRate !== null
+    ? recentSummary.topMoveMatchRate - olderSummary.topMoveMatchRate
+    : null;
+  const cplMagnitude = Number.isFinite(cplShift) ? Math.min(1, Math.abs(cplShift) / 50) : 0;
+  const matchMagnitude = Number.isFinite(matchRateDelta) ? Math.min(1, Math.abs(matchRateDelta) / 0.5) : 0;
+  const score = cplMagnitude * 0.6 + matchMagnitude * 0.4;
+  return { split, recent, older, recentSummary, olderSummary, cplShift, matchRateDelta, score };
+}
+
 export function summarizeTemporalEngineBaseline(results = [], { minGames = TEMPORAL_MIN_GAMES } = {}) {
   const usable = results.filter(item => Number.isFinite(item.centipawnLoss) || typeof item.bestMoveMatches === 'boolean');
   if (usable.length < minGames * 2) {
-    return { status: 'insufficient', recent: null, older: null, cplShift: null, matchRateDelta: null };
+    return { status: 'insufficient', recent: null, older: null, cplShift: null, matchRateDelta: null, candidate: null, candidates: [] };
   }
+
   const ordered = [...usable].sort((a, b) => Number(b.endTime || b.gameEndTime || 0) - Number(a.endTime || a.gameEndTime || 0));
-  const split = Math.floor(ordered.length / 2);
-  const recent = ordered.slice(0, split);
-  const older = ordered.slice(split);
-  const recentSummary = summarizeResults(recent);
-  const olderSummary = summarizeResults(older);
+  const candidates = [];
+  for (let split = minGames; split <= ordered.length - minGames; split += 1) {
+    const candidate = temporalCandidate(ordered, split, minGames);
+    if (candidate) candidates.push(candidate);
+  }
+  candidates.sort((a, b) => b.score - a.score || Math.abs(b.cplShift || 0) - Math.abs(a.cplShift || 0));
+  const best = candidates[0];
+  if (!best) return { status: 'insufficient', recent: null, older: null, cplShift: null, matchRateDelta: null, candidate: null, candidates: [] };
+
   return {
     status: 'complete',
-    recent: recentSummary,
-    older: olderSummary,
-    recentGames: recent.length,
-    olderGames: older.length,
-    cplShift: recentSummary.medianCpl !== null && olderSummary.medianCpl !== null ? recentSummary.medianCpl - olderSummary.medianCpl : null,
-    matchRateDelta: recentSummary.topMoveMatchRate !== null && olderSummary.topMoveMatchRate !== null ? recentSummary.topMoveMatchRate - olderSummary.topMoveMatchRate : null
+    recent: best.recentSummary,
+    older: best.olderSummary,
+    recentGames: best.recent.length,
+    olderGames: best.older.length,
+    cplShift: best.cplShift,
+    matchRateDelta: best.matchRateDelta,
+    candidate: { split: best.split, score: best.score, recentGames: best.recent.length, olderGames: best.older.length, cplShift: best.cplShift, matchRateDelta: best.matchRateDelta },
+    candidates: candidates.slice(0, 6).map(item => ({ split: item.split, score: item.score, cplShift: item.cplShift, matchRateDelta: item.matchRateDelta, recentGames: item.recent.length, olderGames: item.older.length }))
   };
 }
 
