@@ -36,7 +36,7 @@ test('compares current game against personal baseline', () => {
   assert.equal(result.matchRateDelta, 0.2666666666666666);
 });
 
-test('detects a temporal engine-quality shift only with enough historical games', () => {
+test('detects a temporal engine-quality shift and exposes the selected split', () => {
   const results = [
     { gameKey: 'r1', endTime: 20, centipawnLoss: 6, bestMoveMatches: true },
     { gameKey: 'r2', endTime: 19, centipawnLoss: 8, bestMoveMatches: true },
@@ -53,6 +53,10 @@ test('detects a temporal engine-quality shift only with enough historical games'
   assert.equal(result.olderGames, 4);
   assert.equal(result.cplShift, -43.5);
   assert.equal(result.matchRateDelta, 0.75);
+  assert.equal(result.candidate?.split, 4);
+  assert.ok(Array.isArray(result.candidates));
+  assert.ok(result.candidates.length >= 2);
+  assert.ok(result.candidates[0].score >= result.candidates[1].score);
 });
 
 test('does not infer a temporal engine shift from a small sample', () => {
@@ -61,4 +65,5 @@ test('does not infer a temporal engine shift from a small sample', () => {
     { gameKey: 'b', endTime: 1, centipawnLoss: 30, bestMoveMatches: false }
   ]);
   assert.equal(result.status, 'insufficient');
+  assert.equal(result.candidate, null);
 });
