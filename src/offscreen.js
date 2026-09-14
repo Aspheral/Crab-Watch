@@ -1,4 +1,4 @@
-import { movesMatch } from './analysis/engine.js';
+import { movesMatch, scoreLoss } from './analysis/engine.js';
 
 const ENGINE_NAME = 'Stockfish 18 lite single-threaded';
 let engineWorker = null;
@@ -131,9 +131,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const before = await analyzeFen(fingerprintToFen(position.before), message.depth);
         const after = await analyzeFen(fingerprintToFen(position.after), message.depth);
         const playedMove = moveToUci(position.move);
-        const bestCp = scoreToCp(before.score);
-        const playedCp = scoreToCp(invertScore(after.score));
-        const centipawnLoss = bestCp !== null && playedCp !== null ? Math.max(0, Math.round(bestCp - playedCp)) : null;
+        const bestScore = before.score;
+        const playedScore = invertScore(after.score);
+        const bestCp = scoreToCp(bestScore);
+        const playedCp = scoreToCp(playedScore);
+        const centipawnLoss = scoreLoss(bestScore, playedScore);
         results.push({
           ply: position.ply,
           moveNumber: position.moveNumber,
