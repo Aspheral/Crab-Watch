@@ -70,12 +70,21 @@ function similarPositionObservations(similarPositionAnalysis) {
   const matches = Array.isArray(similarPositionAnalysis.selected) ? similarPositionAnalysis.selected : [];
   const strong = matches.filter(item => item.adjustedSimilarity >= 0.9 && item.decisionSimilarity >= 0.75 && item.decisionAgreement);
   if (!strong.length) return [];
-  const uniqueGames = new Set(strong.map(item => item.gameUrl || item.gameId).filter(Boolean));
+  const byGame = new Map();
+  for (const item of strong) {
+    const key = item.gameUrl || item.gameId;
+    if (!key) continue;
+    const previous = byGame.get(key);
+    if (!previous || item.decisionSimilarity > previous.decisionSimilarity || (item.decisionSimilarity === previous.decisionSimilarity && item.adjustedSimilarity > previous.adjustedSimilarity)) byGame.set(key, item);
+  }
+  const representative = [...byGame.values()];
+  if (!representative.length) return [];
+  const uniqueGames = representative.length;
   return [{
     source: 'similar-position',
-    strength: strong.length >= 4 && uniqueGames.size >= 3 ? 'moderate' : 'low',
+    strength: uniqueGames >= 3 ? 'moderate' : 'low',
     kind: 'structurally-similar-decisions',
-    text: `${strong.length} structurally similar historical decision${strong.length === 1 ? '' : 's'} with analogous moves found across ${uniqueGames.size || strong.length} game${uniqueGames.size === 1 ? '' : 's'}.`
+    text: `${uniqueGames} historical game${uniqueGames === 1 ? '' : 's'} contained a structurally similar decision with an analogous move.`
   }];
 }
 
