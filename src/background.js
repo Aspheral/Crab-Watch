@@ -15,7 +15,7 @@ const BASELINE_CACHE_PREFIX = 'crabWatchEngineBaseline:';
 const OFFSCREEN_PATH = 'offscreen.html';
 const HISTORY_CACHE_MS = 12 * 60 * 60 * 1000;
 const BASELINE_CACHE_MS = 7 * 24 * 60 * 60 * 1000;
-const VERSION = '0.10.0';
+const VERSION = '0.11.0';
 
 async function setCrabIcon() {
   try {
