@@ -2,7 +2,7 @@
 
 Crab Watch is a Chrome extension for **post-game chess forensics** on Chess.com.
 
-The goal is not to provide another engine-accuracy meter. Crab Watch examines a completed game in context: historical play, repeated decisions, position difficulty, timing behavior, strength changes, and other signals that may make a game statistically unusual.
+The goal is not to provide another engine-accuracy meter. Crab Watch examines a completed game in context: historical play, repeated decisions, position difficulty, timing behavior, strength changes, personal engine behavior, and other signals that may make a game statistically unusual.
 
 ## Design principles
 
@@ -13,9 +13,9 @@ The goal is not to provide another engine-accuracy meter. Crab Watch examines a 
 - **Quiet UI.** The interface uses clean cards, restrained typography, useful visual summaries, and no fake telemetry or sci-fi dashboard language.
 - **Account size is context, not immunity.** A 351+ game history is retained as account-context evidence, not used as an innocence cutoff.
 
-## Current state: 0.6.0
+## Current state: 0.8.0
 
-The extension now has a working post-game data path:
+The extension now has a working post-game analysis path:
 
 1. Detect a completed Chess.com game.
 2. Capture visible game identity and move information without analyzing the position.
@@ -28,23 +28,31 @@ The extension now has a working post-game data path:
 9. Look for recurring position-and-move decisions across the recent history.
 10. Scan the completed game for **critical decision points**, using tactical forcing moves, material swings, king pressure, branching/mobility, and pawn tension to prioritize positions for deeper analysis.
 11. Extract post-game **clock annotations** when the PGN provides them, measuring move-time distributions, fast-response shares, and compressed think-time patterns without inventing timing evidence when clocks are absent.
-12. Build a descriptive historical-behavior report covering rating context, result profile, account span, repeated opening behavior, exact repeated-position decisions, critical-position findings, and available timing signals.
-13. Store the evidence report for the next analysis layer.
+12. Run **Stockfish 18** only after game completion and only on selected critical positions.
+13. Sample up to **six spaced historical games** and score one critical decision from each to establish a cached personal engine baseline.
+14. Compare the current game's engine agreement and centipawn loss against that player's own sampled baseline, rather than treating a generic engine metric as the whole case.
+15. Build an evidence report separating account context, position difficulty, engine agreement, timing, repeated decisions, and the personal baseline.
+16. Keep calibrated cheating probabilities disabled until a labeled validation corpus exists.
 
-The current history, critical-position, and timing layers are deliberately descriptive. They do **not** claim that repeated opening moves, long account histories, rating changes, a difficult position, fast moves, or a single unusual game prove cheating.
+The current layers are deliberately conservative. They do **not** claim that repeated opening moves, long account histories, rating changes, a difficult position, fast moves, engine agreement, or a single personal-baseline improvement prove cheating.
+
+## Engine architecture
+
+Stockfish is run through a bundled browser worker in a Chrome MV3 offscreen document. The engine path is strictly post-game. The repository includes a reproducible vendor script so executable engine code is not fetched from a remote CDN at review time.
+
+The personal baseline is intentionally small rather than a 300-game engine sweep. Historical positions are spaced across the recent behavioral window, scored at a lower depth, and cached for up to seven days. A personal-baseline signal is only promoted into the evidence report when at least four historical games and four scored positions are available.
 
 ## Planned analysis layers
 
 1. Harden completed-game ingestion and PGN validation
 2. Similar-position matching beyond exact position equality
-3. **Engine agreement and move-quality analysis after game completion**
-4. Player-specific error signatures
-5. Historical strength modeling
-6. Change-point detection
-7. Cross-game anomaly clustering
-8. Multi-engine / multi-depth agreement analysis
-9. Calibrated evidence fusion
-10. Human-readable review reports
+3. Player-specific error signatures beyond engine agreement
+4. Historical strength modeling
+5. Change-point detection
+6. Cross-game anomaly clustering
+7. Multi-engine / multi-depth agreement analysis
+8. Calibrated evidence fusion
+9. Human-readable review reports
 
 ## API behavior
 
