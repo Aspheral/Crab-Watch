@@ -50,6 +50,19 @@ export function summarizeEngineBaseline(results = []) {
   return summarizeResults(results);
 }
 
+function summarizeGameSeries(games = []) {
+  const medianValues = games.map(item => item.medianCpl).filter(Number.isFinite);
+  const meanValues = games.map(item => item.meanCpl).filter(Number.isFinite);
+  const matchValues = games.map(item => item.topMoveMatchRate).filter(Number.isFinite);
+  return {
+    gamesSampled: games.length,
+    positionsScored: games.reduce((sum, item) => sum + (item.positionsScored || 0), 0),
+    medianCpl: median(medianValues),
+    meanCpl: meanValues.length ? meanValues.reduce((sum, value) => sum + value, 0) / meanValues.length : null,
+    topMoveMatchRate: matchValues.length ? matchValues.reduce((sum, value) => sum + value, 0) / matchValues.length : null
+  };
+}
+
 export function aggregateEngineResultsByGame(results = []) {
   const grouped = new Map();
   for (const item of results) {
@@ -77,8 +90,8 @@ function temporalCandidate(ordered, split, minGames) {
   const recent = ordered.slice(0, split);
   const older = ordered.slice(split);
   if (recent.length < minGames || older.length < minGames) return null;
-  const recentSummary = summarizeResults(recent);
-  const olderSummary = summarizeResults(older);
+  const recentSummary = summarizeGameSeries(recent);
+  const olderSummary = summarizeGameSeries(older);
   const cplShift = recentSummary.medianCpl !== null && olderSummary.medianCpl !== null
     ? recentSummary.medianCpl - olderSummary.medianCpl
     : null;
