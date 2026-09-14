@@ -2,6 +2,7 @@ import { detectCriticalPositions } from './critical.js';
 
 export const BASELINE_GAMES = 12;
 export const BASELINE_MAX_POSITIONS = 2;
+export const BASELINE_MAX_POSITIONS_TOTAL = BASELINE_GAMES * BASELINE_MAX_POSITIONS;
 export const TEMPORAL_MIN_GAMES = 4;
 
 function normalizedUrl(game) {
