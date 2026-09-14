@@ -2,12 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { detectChangePoint } from '../src/analysis/changepoint.js';
 
-function game(index, rating, result, moves) {
+function game(index, rating, result, moves, fast = false) {
+  const timed = Array.from({ length: 6 }, (_, i) => {
+    const clock = fast ? `${9 - i}:5${0 - i}` : `${9 - i}:4${9 - i}`;
+    return `{[%clk ${clock}]}`;
+  }).join(' ');
   return {
     end_time: 1000 - index,
     white: { username: 'Opponent', rating, result },
     black: { username: 'Other', rating: 1500, result: result === 'win' ? 'checkmated' : result === 'checkmated' ? 'win' : 'draw' },
-    pgn: `1. e4 ${moves > 20 ? 'e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. h3' : ''} 1-0`
+    pgn: `[TimeControl "60+0"] 1. e4 ${timed} ${moves > 20 ? 'e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. h3' : ''} 1-0`
   };
 }
 
@@ -23,6 +27,18 @@ test('detects a sustained shift in account metrics', () => {
   assert.equal(result.status, 'complete');
   assert.ok(result.candidate);
   assert.ok(Math.abs(result.candidate.ratingShift) >= 150);
+});
+
+test('detects sustained timing behavior change when enough games contain clocks', () => {
+  const games = [];
+  for (let i = 0; i < 16; i += 1) games.push(game(i, 1500, 'draw', 20, i < 8));
+  const result = detectChangePoint(games, 'Opponent');
+  assert.equal(result.status, 'complete');
+  assert.ok(result.candidate);
+  assert.ok(result.candidate.timingShift !== null);
+  assert.ok(Math.abs(result.candidate.timingShift) >= 0.15);
+  assert.ok(result.candidate.timedGamesRecent >= 5);
+  assert.ok(result.candidate.timedGamesOlder >= 5);
 });
 
 test('does not call a one-off result a sustained change', () => {
