@@ -56,6 +56,8 @@ function renderEvidence(evidence) {
     ['Critical positions', evidence.signals.positionDifficulty],
     ['Engine', evidence.signals.moveQuality],
     ['Personal baseline', evidence.signals.humanErrorProfile],
+    ['Change point', evidence.signals.changePoint],
+    ['Similar positions', evidence.signals.similarPosition],
     ['Timing', evidence.signals.timing],
     ['Repeated play', evidence.signals.repeatedDecision]
   ];
