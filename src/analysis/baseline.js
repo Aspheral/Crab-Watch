@@ -35,15 +35,20 @@ function median(values) {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
+function isScoredResult(item) {
+  return Number.isFinite(item?.centipawnLoss) && typeof item?.bestMoveMatches === 'boolean';
+}
+
 function summarizeResults(results = []) {
-  const losses = results.map(item => item.centipawnLoss).filter(Number.isFinite);
-  const matches = results.filter(item => item.bestMoveMatches).length;
+  const scored = results.filter(isScoredResult);
+  const losses = scored.map(item => item.centipawnLoss);
+  const matches = scored.filter(item => item.bestMoveMatches).length;
   return {
-    gamesSampled: new Set(results.map(item => item.gameKey).filter(Boolean)).size,
-    positionsScored: results.length,
+    gamesSampled: new Set(scored.map(item => item.gameKey).filter(Boolean)).size,
+    positionsScored: scored.length,
     medianCpl: median(losses),
     meanCpl: losses.length ? losses.reduce((sum, value) => sum + value, 0) / losses.length : null,
-    topMoveMatchRate: results.length ? matches / results.length : null
+    topMoveMatchRate: scored.length ? matches / scored.length : null
   };
 }
 
@@ -52,12 +57,13 @@ export function summarizeEngineBaseline(results = []) {
 }
 
 function summarizeGameSeries(games = []) {
-  const medianValues = games.map(item => item.medianCpl).filter(Number.isFinite);
-  const meanValues = games.map(item => item.meanCpl).filter(Number.isFinite);
-  const matchValues = games.map(item => item.topMoveMatchRate).filter(Number.isFinite);
+  const usable = games.filter(item => item.positionsScored > 0);
+  const medianValues = usable.map(item => item.medianCpl).filter(Number.isFinite);
+  const meanValues = usable.map(item => item.meanCpl).filter(Number.isFinite);
+  const matchValues = usable.map(item => item.topMoveMatchRate).filter(Number.isFinite);
   return {
-    gamesSampled: games.length,
-    positionsScored: games.reduce((sum, item) => sum + (item.positionsScored || 0), 0),
+    gamesSampled: usable.length,
+    positionsScored: usable.reduce((sum, item) => sum + item.positionsScored, 0),
     medianCpl: median(medianValues),
     meanCpl: meanValues.length ? meanValues.reduce((sum, value) => sum + value, 0) / meanValues.length : null,
     topMoveMatchRate: matchValues.length ? matchValues.reduce((sum, value) => sum + value, 0) / matchValues.length : null
@@ -74,15 +80,16 @@ export function aggregateEngineResultsByGame(results = []) {
   }
 
   return [...grouped.entries()].map(([gameKey, items]) => {
-    const losses = items.map(item => item.centipawnLoss).filter(Number.isFinite);
-    const matchValues = items.filter(item => typeof item.bestMoveMatches === 'boolean').map(item => item.bestMoveMatches ? 1 : 0);
+    const scored = items.filter(isScoredResult);
+    const losses = scored.map(item => item.centipawnLoss);
+    const matches = scored.filter(item => item.bestMoveMatches).length;
     return {
       gameKey,
       endTime: items.map(item => Number(item.endTime)).find(Number.isFinite) ?? null,
-      positionsScored: items.length,
+      positionsScored: scored.length,
       medianCpl: median(losses),
       meanCpl: losses.length ? losses.reduce((sum, value) => sum + value, 0) / losses.length : null,
-      topMoveMatchRate: matchValues.length ? matchValues.reduce((sum, value) => sum + value, 0) / matchValues.length : null
+      topMoveMatchRate: scored.length ? matches / scored.length : null
     };
   }).filter(item => item.positionsScored > 0);
 }
@@ -106,7 +113,7 @@ function temporalCandidate(ordered, split, minGames) {
 }
 
 export function summarizeTemporalEngineBaseline(results = [], { minGames = TEMPORAL_MIN_GAMES } = {}) {
-  const usable = results.filter(item => Number.isFinite(item.medianCpl) || Number.isFinite(item.meanCpl) || Number.isFinite(item.topMoveMatchRate));
+  const usable = results.filter(item => item?.positionsScored > 0 && (Number.isFinite(item.medianCpl) || Number.isFinite(item.meanCpl) || Number.isFinite(item.topMoveMatchRate)));
   if (usable.length < minGames * 2) {
     return { status: 'insufficient', recent: null, older: null, cplShift: null, matchRateDelta: null, candidate: null, candidates: [] };
   }
@@ -163,8 +170,8 @@ export async function buildEngineBaseline({ games = [], username, currentGameUrl
 
 export function compareCurrentToBaseline(currentEngine, baseline) {
   if (!currentEngine?.status || currentEngine.status !== 'complete' || !baseline || baseline.status !== 'complete') return { status: 'insufficient' };
-  const currentResults = Array.isArray(currentEngine.results) ? currentEngine.results : [];
-  const currentLosses = currentResults.map(item => item.centipawnLoss).filter(Number.isFinite);
+  const currentResults = Array.isArray(currentEngine.results) ? currentEngine.results.filter(isScoredResult) : [];
+  const currentLosses = currentResults.map(item => item.centipawnLoss);
   const currentMatches = currentResults.filter(item => item.bestMoveMatches).length;
   if (!currentLosses.length) return { status: 'insufficient' };
   const currentMedianCpl = median(currentLosses);
