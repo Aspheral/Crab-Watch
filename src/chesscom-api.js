@@ -1,7 +1,8 @@
 /** Public Chess.com PubAPI client. Post-game/background use only. */
 const API = 'https://api.chess.com/pub';
-const MAX_GAMES = 300;
-const CACHE_MS = 15 * 60 * 1000;
+const HISTORY_WINDOW = 300;
+const ACCOUNT_CONTEXT_WINDOW = 351;
+const CACHE_MS = 12 * 60 * 60 * 1000;
 
 function validUsername(username) {
   return typeof username === 'string' && /^[A-Za-z0-9_-]{2,25}$/.test(username);
@@ -28,7 +29,7 @@ export async function getArchive(url) {
   return getJson(url);
 }
 
-export async function getRecentGames(username, limit = MAX_GAMES) {
+export async function getRecentGames(username, limit = HISTORY_WINDOW) {
   const player = await getPlayer(username);
   const archives = await getArchives(username);
   const urls = Array.isArray(archives.archives) ? [...archives.archives].reverse() : [];
@@ -44,4 +45,4 @@ export async function getRecentGames(username, limit = MAX_GAMES) {
   return { player, games: games.slice(0, limit), fetchedAt: Date.now(), cacheMs: CACHE_MS };
 }
 
-export { validUsername, MAX_GAMES, CACHE_MS };
+export { validUsername, HISTORY_WINDOW, ACCOUNT_CONTEXT_WINDOW, CACHE_MS };
