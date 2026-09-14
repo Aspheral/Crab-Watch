@@ -3,6 +3,7 @@ const gameCard = document.querySelector('#gameCard');
 const opponent = document.querySelector('#opponent');
 const result = document.querySelector('#result');
 const gameMeta = document.querySelector('#gameMeta');
+const criticalCount = document.querySelector('#criticalCount');
 const review = document.querySelector('#review');
 const historyCount = document.querySelector('#historyCount');
 const historyBars = document.querySelector('#historyBars');
@@ -52,6 +53,7 @@ function renderEvidence(evidence) {
   const rows = [
     ['History', evidence.signals.accountHistory],
     ['Strength', evidence.signals.historicalStrength],
+    ['Critical positions', evidence.signals.positionDifficulty],
     ['Repeated play', evidence.signals.repeatedDecision]
   ];
   for (const [label, signal] of rows) {
@@ -70,6 +72,8 @@ async function renderStoredReview(review) {
   if (!review) return;
   historyCount.textContent = review.historyCount || 0;
   renderHistoryShape(review.historyCount || 0);
+  const critical = review.criticalAnalysis?.selected || [];
+  criticalCount.textContent = critical.length || '0';
   result.textContent = review.evidence?.assessment?.level === 'context-only' ? 'In context' : 'Reviewed';
   renderEvidence(review.evidence);
 }
@@ -95,6 +99,7 @@ async function load() {
     await renderStoredReview(previous);
   } else {
     historyCount.textContent = '—';
+    criticalCount.textContent = '—';
     renderHistoryShape(0);
     result.textContent = 'Ready';
   }
