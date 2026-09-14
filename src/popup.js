@@ -109,12 +109,24 @@ async function load() {
   const stored = await chrome.storage.local.get(['crabWatchGameState', 'crabWatchReview']);
   const game = stored.crabWatchGameState;
   const previous = stored.crabWatchReview;
-  if (!game?.finished) return;
-
   state.hidden = true;
   gameCard.hidden = false;
-  review.disabled = false;
   error.hidden = true;
+
+  if (!game?.finished) {
+    opponent.textContent = 'Waiting for a finished game';
+    gameMeta.textContent = 'Finish the game, then reopen Crab Watch';
+    criticalCount.textContent = '—';
+    historyCount.textContent = '0';
+    renderHistoryShape(0);
+    result.textContent = 'Waiting';
+    review.disabled = true;
+    review.textContent = 'Finish a game to review';
+    return;
+  }
+
+  review.disabled = false;
+  review.textContent = 'Review game';
 
   const players = Array.isArray(game.players) ? game.players : [];
   const current = game.currentUser?.toLowerCase();
@@ -137,21 +149,26 @@ review.addEventListener('click', async () => {
   error.hidden = true;
   review.textContent = 'Reviewing…';
 
-  const response = await chrome.runtime.sendMessage({ type: 'REQUEST_REVIEW' });
-  if (!response?.ok) {
-    showError(response?.error || 'The completed game could not be prepared.');
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'REQUEST_REVIEW' });
+    if (!response?.ok) throw new Error(response?.error || 'The completed game could not be prepared.');
+
+    await renderStoredReview(response.review);
+    gameMeta.textContent = `${response.review.historyCount} games collected`;
+    review.textContent = 'History reviewed';
+  } catch (reviewError) {
+    showError(reviewError.message || 'The completed game could not be prepared.');
     review.disabled = false;
     review.textContent = 'Review game';
-    return;
   }
-
-  await renderStoredReview(response.review);
-  gameMeta.textContent = `${response.review.historyCount} games collected`;
-  review.textContent = 'History reviewed';
 });
 
 document.querySelector('#settings').addEventListener('click', () => {
   chrome.tabs.create({ url: 'https://github.com/Aspheral/Crab-Watch' });
+});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && (changes.crabWatchGameState || changes.crabWatchReview)) load();
 });
 
 load();
