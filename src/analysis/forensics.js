@@ -50,7 +50,23 @@ function baselineObservations(engineBaseline) {
   return observations;
 }
 
-export function createEvidenceReport({ game, history = [], player = null, historyAnalysis = null, criticalAnalysis = null, timingAnalysis = null, engineAnalysis = null, engineBaseline = null }) {
+function changePointObservations(changePointAnalysis) {
+  if (!changePointAnalysis || changePointAnalysis.status !== 'complete' || !changePointAnalysis.candidate) return [];
+  const candidate = changePointAnalysis.candidate;
+  const observations = [];
+  if (candidate.ratingShift !== null && Math.abs(candidate.ratingShift) >= 200) {
+    observations.push({ source: 'change-point', strength: 'moderate', kind: 'sustained-rating-shift', text: `The recent account segment is about ${Math.round(Math.abs(candidate.ratingShift))} rating points ${candidate.ratingShift >= 0 ? 'higher' : 'lower'} than the older segment.` });
+  }
+  if (candidate.resultShift !== null && Math.abs(candidate.resultShift) >= 0.25) {
+    observations.push({ source: 'change-point', strength: 'low', kind: 'sustained-result-shift', text: `The recent segment's score rate changed by about ${Math.round(Math.abs(candidate.resultShift) * 100)} percentage points.` });
+  }
+  if (candidate.moveShift !== null && Math.abs(candidate.moveShift) >= 12) {
+    observations.push({ source: 'change-point', strength: 'low', kind: 'sustained-game-length-shift', text: `The recent segment's average game length changed by about ${Math.round(Math.abs(candidate.moveShift))} plies.` });
+  }
+  return observations;
+}
+
+export function createEvidenceReport({ game, history = [], player = null, historyAnalysis = null, criticalAnalysis = null, timingAnalysis = null, engineAnalysis = null, engineBaseline = null, changePointAnalysis = null }) {
   if (!game?.finished) throw new Error('Crab Watch only accepts completed games.');
   const signals = SIGNALS.reduce((out, key) => { out[key] = { status: 'not-run', observations: [] }; return out; }, {});
   signals.accountHistory = { status: 'complete', observations: evidenceFromHistory(historyAnalysis?.observations || []) };
@@ -78,15 +94,17 @@ export function createEvidenceReport({ game, history = [], player = null, histor
   signals.timing = { status: timingAnalysis?.status === 'complete' ? 'complete' : timingAnalysis ? 'no-data' : 'not-run', observations: timingObservations(timingAnalysis) };
   signals.moveQuality = { status: engineAnalysis?.status === 'complete' ? 'complete' : engineAnalysis ? engineAnalysis.status : 'not-run', observations: engineObservations(engineAnalysis) };
   signals.humanErrorProfile = { status: engineBaseline?.comparison?.status === 'complete' ? 'complete' : engineBaseline ? 'no-baseline' : 'not-run', observations: baselineObservations(engineBaseline) };
+  signals.changePoint = { status: changePointAnalysis?.status === 'complete' ? 'complete' : changePointAnalysis ? changePointAnalysis.status : 'not-run', observations: changePointObservations(changePointAnalysis) };
 
   return {
-    version: 7,
+    version: 8,
     player,
     sample: { currentGame: game, historyGames: history.length },
     critical: criticalAnalysis || { status: 'not-run' },
     timing: timingAnalysis || { status: 'not-run' },
     engine: engineAnalysis || { status: 'not-run' },
     personalBaseline: engineBaseline || { status: 'not-run' },
+    changePoint: changePointAnalysis || { status: 'not-run' },
     signals,
     assessment: classifyAssessment({ signals })
   };
