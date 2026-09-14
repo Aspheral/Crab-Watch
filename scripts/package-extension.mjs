@@ -18,6 +18,10 @@ const runtimeDirs = [
   'assets',
   'vendor',
 ];
+const requiredVendorFiles = [
+  'vendor/stockfish/stockfish-18-lite-single.js',
+  'vendor/stockfish/stockfish-18-lite-single.wasm',
+];
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -27,6 +31,14 @@ const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
 assert(manifest.manifest_version === 3, 'Release package requires Manifest V3.');
 assert(typeof manifest.version === 'string' && /^\d+(?:\.\d+){0,3}$/.test(manifest.version), `Invalid Chrome extension version: ${manifest.version}`);
 assert(manifest.version_name, 'manifest.version_name is required for a beta release.');
+
+for (const relativePath of requiredVendorFiles) {
+  try {
+    await fs.access(path.join(root, relativePath));
+  } catch {
+    throw new Error(`Bundled engine file missing: ${relativePath}. Run npm run vendor:stockfish before packaging.`);
+  }
+}
 
 await fs.rm(outputDir, { recursive: true, force: true });
 await fs.mkdir(outputDir, { recursive: true });
@@ -46,11 +58,9 @@ const iconOutputDir = path.join(outputDir, 'assets', 'icons');
 await fs.mkdir(iconOutputDir, { recursive: true });
 
 async function rasterizeIcons() {
-  const candidates = process.platform === 'win32'
-    ? ['magick', 'convert']
-    : ['magick', 'convert'];
-
+  const candidates = process.platform === 'win32' ? ['magick', 'convert'] : ['magick', 'convert'];
   let command = null;
+
   for (const candidate of candidates) {
     try {
       await execFileAsync(candidate, ['-version']);
@@ -59,7 +69,10 @@ async function rasterizeIcons() {
     } catch {}
   }
 
-  assert(command, 'ImageMagick is required to rasterize assets/crab.svg into Web Store PNG icons. Install ImageMagick and rerun npm run package:extension.');
+  assert(
+    command,
+    'ImageMagick is required to rasterize assets/crab.svg into Web Store PNG icons. Install ImageMagick and rerun npm run package:extension.',
+  );
 
   for (const size of [16, 32, 48, 128]) {
     const target = path.join(iconOutputDir, `icon${size}.png`);
@@ -92,11 +105,7 @@ const packagedManifest = {
   },
 };
 
-await fs.writeFile(
-  path.join(outputDir, 'manifest.json'),
-  `${JSON.stringify(packagedManifest, null, 2)}\n`,
-  'utf8',
-);
+await fs.writeFile(path.join(outputDir, 'manifest.json'), `${JSON.stringify(packagedManifest, null, 2)}\n`, 'utf8');
 
 for (const size of [16, 32, 48, 128]) {
   const iconPath = path.join(iconOutputDir, `icon${size}.png`);
@@ -122,3 +131,4 @@ console.log(`Packaged Crab Watch ${manifest.version_name}`);
 console.log(`ZIP: ${archivePath}`);
 console.log(`Size: ${stat.size} bytes`);
 console.log('Icons: assets/crab.svg -> PNG 16/32/48/128');
+console.log('Bundled engine: Stockfish 18 lite single-threaded');
