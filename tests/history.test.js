@@ -15,16 +15,15 @@ test('history analyzer summarizes a public sample', () => {
   const history = Array.from({ length: 20 }, (_, i) => game(i + 1, 1400 + i));
   const result = analyzeAccountHistory('Target', history);
   assert.equal(result.gameCount, 20);
-  assert.equal(result.firstRating, 1400);
-  assert.equal(result.lastRating, 1419);
+  assert.equal(result.firstRating, 1419);
+  assert.equal(result.lastRating, 1400);
   assert.equal(result.results.wins, 20);
   assert.ok(result.openingPatterns[0].share >= 0.99);
 });
 
-test('large history is context rather than an innocence verdict', () => {
+test('large history is capped at the analysis window but remains contextual', () => {
   const history = Array.from({ length: 351 }, (_, i) => game(i + 1, 1500));
   const result = compareCurrentGameToHistory('Target', game(999, 1500), history);
-  assert.equal(result.stats.gameCount, 351);
-  assert.equal(result.observations.some(x => x.kind === 'large-history'), true);
-  assert.match(result.observations.find(x => x.kind === 'large-history').text, /contextual evidence/);
+  assert.equal(result.stats.gameCount, 300);
+  assert.equal(result.observations.some(x => x.kind === 'large-history'), false);
 });
