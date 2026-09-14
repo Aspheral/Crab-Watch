@@ -3,15 +3,14 @@ import assert from 'node:assert/strict';
 import { detectChangePoint } from '../src/analysis/changepoint.js';
 
 function game(index, rating, result, moves, fast = false) {
-  const clocks = fast
-    ? ['0:30', '0:28', '0:26', '0:24', '0:22', '0:20']
-    : ['0:55', '0:45', '0:35', '0:25', '0:15', '0:05'];
-  const timed = clocks.map(clock => `{[%clk ${clock}]}`).join(' ');
+  const timed = fast
+    ? 'e4 {[%clk 0:59]} e5 {[%clk 0:59]} Nf3 {[%clk 0:57]} Nc6 {[%clk 0:58]} Bb5 {[%clk 0:55]} a6 {[%clk 0:57]}'
+    : 'e4 {[%clk 0:59]} e5 {[%clk 0:50]} Nf3 {[%clk 0:49]} Nc6 {[%clk 0:40]} Bb5 {[%clk 0:39]} a6 {[%clk 0:30]}';
   return {
     end_time: 1000 - index,
     white: { username: 'Opponent', rating, result },
     black: { username: 'Other', rating: 1500, result: result === 'win' ? 'checkmated' : result === 'checkmated' ? 'win' : 'draw' },
-    pgn: `[TimeControl "60+0"] 1. e4 ${timed} ${moves > 20 ? 'e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. h3' : ''} 1-0`
+    pgn: `[TimeControl "60+0"] ${timed} ${moves > 20 ? '7. Ba4 Nf6 8. O-O Be7 9. Re1' : ''} 1-0`
   };
 }
 
