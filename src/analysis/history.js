@@ -1,5 +1,8 @@
 import { positionFingerprints } from './chess-position.js';
 
+const ANALYSIS_WINDOW = 300;
+const ACCOUNT_CONTEXT_THRESHOLD = 351;
+
 function gameFor(username, game) {
   const lower = username.toLowerCase();
   const white = game?.white?.username?.toLowerCase();
@@ -99,7 +102,8 @@ function currentPositionDecisions(username, currentGame, repeated) {
 }
 
 export function analyzeAccountHistory(username, games) {
-  const recent = Array.isArray(games) ? games.slice(0, 300) : [];
+  const available = Array.isArray(games) ? games : [];
+  const recent = available.slice(0, ANALYSIS_WINDOW);
   const ratings = [];
   const results = { wins: 0, losses: 0, draws: 0 };
   const performance = [];
@@ -130,7 +134,8 @@ export function analyzeAccountHistory(username, games) {
   const firstGameTime = dates.length ? Math.min(...dates) : null;
   const lastGameTime = dates.length ? Math.max(...dates) : null;
   return {
-    gameCount: recent.length, ratedGames: rated, results,
+    gameCount: recent.length, availableGames: available.length, ratedGames: rated, results,
+    largeHistory: available.length >= ACCOUNT_CONTEXT_THRESHOLD,
     winRate: results.wins + results.losses + results.draws ? results.wins / (results.wins + results.losses + results.draws) : null,
     medianRating: median(ratings), firstRating, lastRating, ratingDelta,
     firstGameTime, lastGameTime,
@@ -150,7 +155,7 @@ export function compareCurrentGameToHistory(username, currentGame, history) {
   const currentRepeated = currentPositionDecisions(username, currentGame, stats.repeatedDecisions.repeated);
   const repeatedSame = currentRepeated.filter(item => item.sameMove && item.share >= 0.8 && item.occurrences >= 3);
 
-  if (stats.gameCount >= 350) observations.push({ kind: 'large-history', strength: 'context', text: 'The account has a large public game history. Account longevity is contextual evidence, not an innocence guarantee.' });
+  if (stats.largeHistory) observations.push({ kind: 'large-history', strength: 'context', text: 'The account has at least 351 games in the sampled public history. Longevity is contextual evidence, not an innocence guarantee.' });
   if (stats.ratingDelta !== null && Math.abs(stats.ratingDelta) >= 400) observations.push({ kind: 'rating-change', strength: 'context', text: `The sampled history spans a rating change of about ${Math.round(Math.abs(stats.ratingDelta))} points.` });
   if (currentRating && stats.medianRating && Math.abs(currentRating - stats.medianRating) >= 250) observations.push({ kind: 'rating-context', strength: 'moderate', text: 'The current game rating is notably different from the player’s recent median.' });
 
