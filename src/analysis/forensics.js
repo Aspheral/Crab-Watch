@@ -18,7 +18,19 @@ function evidenceFromHistory(observations = []) {
   return observations.map(observation => ({ source: 'history', strength: observation.strength, kind: observation.kind, text: observation.text }));
 }
 
-export function createEvidenceReport({ game, history = [], player = null, historyAnalysis = null, criticalAnalysis = null }) {
+function timingObservations(timing) {
+  if (!timing || timing.status !== 'complete' || timing.timedMoves < 3) return [];
+  const observations = [];
+  if (timing.veryFastShare !== null && timing.veryFastShare >= 0.65) {
+    observations.push({ source: 'timing', strength: 'low', kind: 'very-fast-response-rate', text: `${Math.round(timing.veryFastShare * 100)}% of moves with clock data were completed within two seconds.` });
+  }
+  if (timing.fastShare !== null && timing.fastShare >= 0.85 && timing.standardDeviation !== null && timing.standardDeviation < 3) {
+    observations.push({ source: 'timing', strength: 'low', kind: 'compressed-think-time', text: 'The recorded move times are unusually concentrated in a narrow fast-response range.' });
+  }
+  return observations;
+}
+
+export function createEvidenceReport({ game, history = [], player = null, historyAnalysis = null, criticalAnalysis = null, timingAnalysis = null }) {
   if (!game?.finished) throw new Error('Crab Watch only accepts completed games.');
   const signals = SIGNALS.reduce((out, key) => {
     out[key] = { status: 'not-run', observations: [] };
@@ -64,11 +76,17 @@ export function createEvidenceReport({ game, history = [], player = null, histor
       }))
   };
 
+  signals.timing = {
+    status: timingAnalysis?.status === 'complete' ? 'complete' : timingAnalysis ? 'no-data' : 'not-run',
+    observations: timingObservations(timingAnalysis)
+  };
+
   return {
-    version: 4,
+    version: 5,
     player,
     sample: { currentGame: game, historyGames: history.length },
     critical: criticalAnalysis || { status: 'not-run' },
+    timing: timingAnalysis || { status: 'not-run' },
     signals,
     assessment: classifyAssessment({ signals })
   };
