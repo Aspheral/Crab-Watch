@@ -41,19 +41,21 @@ test('detects a temporal engine-quality shift and exposes the selected split', (
     { gameKey: 'r1', endTime: 20, centipawnLoss: 6, bestMoveMatches: true },
     { gameKey: 'r2', endTime: 19, centipawnLoss: 8, bestMoveMatches: true },
     { gameKey: 'r3', endTime: 18, centipawnLoss: 10, bestMoveMatches: true },
-    { gameKey: 'r4', endTime: 17, centipawnLoss: 12, bestMoveMatches: false },
-    { gameKey: 'o1', endTime: 4, centipawnLoss: 45, bestMoveMatches: false },
-    { gameKey: 'o2', endTime: 3, centipawnLoss: 50, bestMoveMatches: false },
-    { gameKey: 'o3', endTime: 2, centipawnLoss: 55, bestMoveMatches: false },
-    { gameKey: 'o4', endTime: 1, centipawnLoss: 60, bestMoveMatches: false }
+    { gameKey: 'r4', endTime: 17, centipawnLoss: 12, bestMoveMatches: true },
+    { gameKey: 'r5', endTime: 16, centipawnLoss: 14, bestMoveMatches: false },
+    { gameKey: 'o1', endTime: 5, centipawnLoss: 45, bestMoveMatches: false },
+    { gameKey: 'o2', endTime: 4, centipawnLoss: 50, bestMoveMatches: false },
+    { gameKey: 'o3', endTime: 3, centipawnLoss: 55, bestMoveMatches: false },
+    { gameKey: 'o4', endTime: 2, centipawnLoss: 60, bestMoveMatches: false },
+    { gameKey: 'o5', endTime: 1, centipawnLoss: 65, bestMoveMatches: false }
   ];
   const result = summarizeTemporalEngineBaseline(results);
   assert.equal(result.status, 'complete');
-  assert.equal(result.recentGames, 4);
-  assert.equal(result.olderGames, 4);
-  assert.equal(result.cplShift, -43.5);
-  assert.equal(result.matchRateDelta, 0.75);
-  assert.equal(result.candidate?.split, 4);
+  assert.equal(result.recentGames, 5);
+  assert.equal(result.olderGames, 5);
+  assert.equal(result.cplShift, -45);
+  assert.equal(result.matchRateDelta, 0.8);
+  assert.equal(result.candidate?.split, 5);
   assert.ok(Array.isArray(result.candidates));
   assert.ok(result.candidates.length >= 2);
   assert.ok(result.candidates[0].score >= result.candidates[1].score);
