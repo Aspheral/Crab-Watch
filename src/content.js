@@ -6,6 +6,11 @@
   const GAME_PATH = /\/game\/(?:live|daily|computer)\//i;
   const FINISH_TEXT_RE = /game\s+(?:over|review)|rematch|resign(?:ed|ation)?|checkmate|stalemate|draw(?:\s+agreed)?|timeout|time\s*forfeit|abandon(?:ed)?|you\s+(?:won|lost)|won\s+by|lost\s+by|game\s+ended/i;
   const FINISH_SELECTOR_RE = /game[-_\s]?(?:over|review|result|complete)|rematch/i;
+  const RESULT_OPPONENT_RE = [
+    /you\s+(?:beat|defeated|won\s+against)\s+([A-Za-z0-9_-]{2,25})/i,
+    /you\s+lost\s+to\s+([A-Za-z0-9_-]{2,25})/i,
+    /([A-Za-z0-9_-]{2,25})\s+(?:won|lost)\b/i
+  ];
   let lastUrl = location.href;
   let lastGame = null;
   let announced = false;
@@ -48,6 +53,15 @@
     return players;
   }
 
+  function resultOpponent() {
+    const text = document.body?.innerText || '';
+    for (const pattern of RESULT_OPPONENT_RE) {
+      const match = text.match(pattern);
+      if (match?.[1]) return match[1];
+    }
+    return null;
+  }
+
   function likelyCurrentUser(players) {
     const playerKeys = new Map(players.map(name => [name.toLowerCase(), name]));
     const candidates = [];
@@ -72,7 +86,7 @@
 
   function detectComputerOpponent() {
     if (!/\/game\/computer\//i.test(location.pathname)) return null;
-    const selectors = ['[data-test*="player"]', '[data-cy*="player"]', '[class*="player-name"]', '[class*="playerName"]', '[class*="player-name"]'];
+    const selectors = ['[data-test*="player"]', '[data-cy*="player"]', '[class*="player-name"]', '[class*="playerName"]'];
     for (const selector of selectors) {
       for (const node of document.querySelectorAll(selector)) {
         const text = clean(node.textContent || node.innerText);
@@ -110,7 +124,8 @@
     if (!looksFinished()) return null;
     const players = playerLinks();
     const computer = /\/game\/computer\//i.test(location.pathname);
-    const opponent = computer ? detectComputerOpponent() : null;
+    const opponent = computer ? (detectComputerOpponent() || resultOpponent()) : resultOpponent();
+    if (opponent && !players.some(name => name.toLowerCase() === opponent.toLowerCase())) players.push(opponent);
     return {
       source: 'chess.com',
       finished: true,
