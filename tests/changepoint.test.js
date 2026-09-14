@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { detectChangePoint } from '../src/analysis/changepoint.js';
 
 function game(index, rating, result, moves, fast = false) {
-  const timed = Array.from({ length: 6 }, (_, i) => {
-    const clock = fast ? `${9 - i}:5${0 - i}` : `${9 - i}:4${9 - i}`;
-    return `{[%clk ${clock}]}`;
-  }).join(' ');
+  const clocks = fast
+    ? ['0:30', '0:28', '0:26', '0:24', '0:22', '0:20']
+    : ['0:55', '0:45', '0:35', '0:25', '0:15', '0:05'];
+  const timed = clocks.map(clock => `{[%clk ${clock}]}`).join(' ');
   return {
     end_time: 1000 - index,
     white: { username: 'Opponent', rating, result },
