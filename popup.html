@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Crab Watch</title>
+  <link rel="stylesheet" href="src/popup.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <img src="assets/crab.svg" alt="" class="logo">
+        <span>Crab Watch</span>
+      </div>
+      <button class="icon-button" id="settings" aria-label="Settings">⚙</button>
+    </header>
+
+    <section class="hero" id="state">
+      <div class="hero-icon"><img src="assets/crab.svg" alt=""></div>
+      <div>
+        <h1>Review a finished game</h1>
+        <p>Crab Watch looks for unusual patterns in completed games and account history.</p>
+      </div>
+    </section>
+
+    <section class="card game-card" id="gameCard" hidden>
+      <div class="card-heading">
+        <div>
+          <span class="eyebrow">Recent game</span>
+          <h2 id="opponent">Opponent</h2>
+        </div>
+        <span class="result" id="result">—</span>
+      </div>
+      <div class="meter" aria-label="Review status"><span id="meterFill"></span></div>
+      <div class="row"><span>Game</span><span id="gameMeta">Finished</span></div>
+    </section>
+
+    <button class="primary" id="review" disabled>Review game</button>
+
+    <p class="footnote">Analysis begins only after a game has finished.</p>
+  </main>
+  <script src="src/popup.js"></script>
+</body>
+</html>
