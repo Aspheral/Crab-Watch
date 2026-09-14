@@ -1,5 +1,8 @@
+import { analyzeTiming } from './timing.js';
+
 export const MIN_SEGMENT_GAMES = 8;
 export const MIN_SHIFT_GAMES = 5;
+export const MIN_TIMING_GAMES = 5;
 
 function finite(values) {
   return values.filter(Number.isFinite);
@@ -17,16 +20,21 @@ function median(values) {
   return data.length % 2 ? data[middle] : (data[middle - 1] + data[middle]) / 2;
 }
 
-function ratingOf(game, username) {
+function sideFor(game, username) {
   const lower = username?.toLowerCase();
   if (!lower) return null;
-  const side = game?.white?.username?.toLowerCase() === lower ? game.white : game?.black?.username?.toLowerCase() === lower ? game.black : null;
+  if (game?.white?.username?.toLowerCase() === lower) return { side: game.white, color: 'w' };
+  if (game?.black?.username?.toLowerCase() === lower) return { side: game.black, color: 'b' };
+  return null;
+}
+
+function ratingOf(game, username) {
+  const side = sideFor(game, username)?.side;
   return Number.isFinite(Number(side?.rating)) ? Number(side.rating) : null;
 }
 
 function winValue(game, username) {
-  const lower = username?.toLowerCase();
-  const side = game?.white?.username?.toLowerCase() === lower ? game.white : game?.black?.username?.toLowerCase() === lower ? game.black : null;
+  const side = sideFor(game, username)?.side;
   if (!side) return null;
   if (side.result === 'win') return 1;
   if (side.result === 'draw') return 0.5;
@@ -35,24 +43,43 @@ function winValue(game, username) {
 }
 
 function gameMetric(game, username) {
+  const side = sideFor(game, username);
   const rating = ratingOf(game, username);
   const result = winValue(game, username);
-  const clock = String(game?.pgn || '').match(/\[%clk\s+([^\]]+)\]/gi);
-  const moveCount = String(game?.pgn || '')
+  const pgn = String(game?.pgn || '');
+  const clock = pgn.match(/\[%clk\s+([^\]]+)\]/gi);
+  const moveCount = pgn
     .replace(/\[[^\]]*\]/g, ' ')
     .replace(/\{[^}]*\}/g, ' ')
     .replace(/\([^)]*\)/g, ' ')
     .match(/\b(?:O-O(?:-O)?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?|[a-h]x?[a-h]?[1-8](?:=[QRBN])?[+#]?)\b/g);
+  const timing = side ? analyzeTiming(pgn, side.color) : null;
   return {
     rating,
     result,
     clockCount: clock?.length || 0,
-    moves: moveCount?.length || 0
+    moves: moveCount?.length || 0,
+    timing,
+    timedMoves: timing?.timedMoves || 0,
+    veryFastShare: timing?.veryFastShare ?? null,
+    medianSeconds: timing?.medianSeconds ?? null
   };
 }
 
 function segmentAverage(values, start, end) {
   return mean(values.slice(start, end));
+}
+
+function timingSegmentStats(metrics, start, end) {
+  const segment = metrics.slice(start, end).filter(item => item.timedMoves >= 2 && Number.isFinite(item.veryFastShare));
+  if (segment.length < MIN_TIMING_GAMES) {
+    return { gameCount: segment.length, veryFastShare: null, medianSeconds: null };
+  }
+  return {
+    gameCount: segment.length,
+    veryFastShare: mean(segment.map(item => item.veryFastShare)),
+    medianSeconds: median(segment.map(item => item.medianSeconds))
+  };
 }
 
 export function detectChangePoint(games = [], username, { minSegmentGames = MIN_SEGMENT_GAMES } = {}) {
@@ -78,6 +105,15 @@ export function detectChangePoint(games = [], username, { minSegmentGames = MIN_
     const resultShift = recentResult !== null && olderResult !== null ? recentResult - olderResult : null;
     const moveShift = recentMoves !== null && olderMoves !== null ? recentMoves - olderMoves : null;
 
+    const recentTiming = timingSegmentStats(metrics, 0, split);
+    const olderTiming = timingSegmentStats(metrics, split, metrics.length);
+    const timingShift = recentTiming.veryFastShare !== null && olderTiming.veryFastShare !== null
+      ? recentTiming.veryFastShare - olderTiming.veryFastShare
+      : null;
+    const medianTimeShift = recentTiming.medianSeconds !== null && olderTiming.medianSeconds !== null
+      ? recentTiming.medianSeconds - olderTiming.medianSeconds
+      : null;
+
     let score = 0;
     const reasons = [];
     if (ratingShift !== null && Math.abs(ratingShift) >= 150) {
@@ -92,8 +128,25 @@ export function detectChangePoint(games = [], username, { minSegmentGames = MIN_
       score += Math.min(20, Math.round(Math.abs(moveShift)));
       reasons.push(`game-length shift ${Math.round(moveShift)} plies`);
     }
+    if (timingShift !== null && Math.abs(timingShift) >= 0.15) {
+      score += Math.min(15, Math.round(Math.abs(timingShift) * 50));
+      reasons.push(`very-fast move-share shift ${Math.round(timingShift * 100)} percentage points`);
+    }
 
-    if (score > 0) candidates.push({ split, score, ratingShift, resultShift, moveShift, reasons });
+    if (score > 0) {
+      candidates.push({
+        split,
+        score,
+        ratingShift,
+        resultShift,
+        moveShift,
+        timingShift,
+        medianTimeShift,
+        timedGamesRecent: recentTiming.gameCount,
+        timedGamesOlder: olderTiming.gameCount,
+        reasons
+      });
+    }
   }
 
   candidates.sort((a, b) => b.score - a.score || a.split - b.split);
