@@ -43,6 +43,12 @@ function baselineObservations(engineBaseline) {
   const observations = [];
   if (comparison.baselineMedianCpl !== null && comparison.currentMedianCpl !== null && comparison.currentMedianCpl <= comparison.baselineMedianCpl * 0.45) observations.push({ source: 'personal-baseline', strength: 'moderate', kind: 'historical-engine-improvement', text: `The selected critical decisions had a median engine loss of about ${Math.round(comparison.currentMedianCpl)} cp versus about ${Math.round(comparison.baselineMedianCpl)} cp in the sampled historical baseline.` });
   if (comparison.baselineMatchRate !== null && comparison.currentMatchRate !== null && comparison.matchRateDelta >= 0.35) observations.push({ source: 'personal-baseline', strength: 'moderate', kind: 'historical-top-move-improvement', text: `Top-move agreement was about ${Math.round(comparison.currentMatchRate * 100)}% in this game versus ${Math.round(comparison.baselineMatchRate * 100)}% in the sampled historical baseline.` });
+
+  const temporal = engineBaseline?.temporal;
+  if (temporal?.status === 'complete' && temporal.recentGames >= 4 && temporal.olderGames >= 4) {
+    if (temporal.cplShift !== null && temporal.cplShift <= -20) observations.push({ source: 'personal-baseline', strength: 'low', kind: 'temporal-engine-improvement', text: `The recent historical engine sample has a median CPL about ${Math.round(Math.abs(temporal.cplShift))} cp lower than the older sampled segment.` });
+    if (temporal.matchRateDelta !== null && temporal.matchRateDelta >= 0.25) observations.push({ source: 'personal-baseline', strength: 'low', kind: 'temporal-top-move-improvement', text: `Top-move agreement increased by about ${Math.round(temporal.matchRateDelta * 100)} percentage points between the older and recent sampled segments.` });
+  }
   return observations;
 }
 
