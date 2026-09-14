@@ -1,10 +1,11 @@
 import { getRecentGames, validUsername, MAX_GAMES } from './chesscom-api.js';
 import { compareCurrentGameToHistory } from './analysis/history.js';
+import { createEvidenceReport } from './analysis/forensics.js';
 
 const GAME_STATE_KEY = 'crabWatchGameState';
 const REVIEW_KEY = 'crabWatchReview';
 const CACHE_KEY_PREFIX = 'crabWatchHistory:';
-const VERSION = '0.3.0';
+const VERSION = '0.4.0';
 
 async function setCrabIcon() {
   try {
@@ -69,19 +70,27 @@ async function requestReview(sendResponse) {
   }
 
   const history = await cachedHistory(opponent);
-  const currentGame = findCurrentGame(history.games || [], state);
-  const comparison = compareCurrentGameToHistory(opponent, currentGame || state, history.games || []);
+  const games = history.games || [];
+  const currentGame = findCurrentGame(games, state) || state;
+  const historyAnalysis = compareCurrentGameToHistory(opponent, currentGame, games);
+  const evidence = createEvidenceReport({
+    game: { ...currentGame, finished: true },
+    history: games,
+    player: opponent,
+    historyAnalysis
+  });
 
   const review = {
     version: VERSION,
-    completedGame: currentGame || state,
+    completedGame: currentGame,
     opponent,
-    history: history.games || [],
+    history: games,
     player: history.player || null,
-    historyCount: history.games?.length || 0,
+    historyCount: games.length,
     historyFetchedAt: history.fetchedAt,
     fromCache: history.fromCache,
-    historyAnalysis: comparison,
+    historyAnalysis,
+    evidence,
     analysis: {
       engine: 'not-run',
       status: 'history-context-ready'
@@ -95,11 +104,7 @@ async function requestReview(sendResponse) {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === 'GAME_FINISHED') {
-    const state = {
-      ...message.payload,
-      receivedAt: Date.now(),
-      tabId: sender.tab?.id ?? null
-    };
+    const state = { ...message.payload, receivedAt: Date.now(), tabId: sender.tab?.id ?? null };
     chrome.storage.local.set({ [GAME_STATE_KEY]: state }).then(() => sendResponse({ ok: true }));
     return true;
   }
