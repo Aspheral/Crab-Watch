@@ -36,3 +36,16 @@ test('allows moderate engine agreement once four positions are sampled', () => {
   assert.equal(report.signals.moveQuality.observations[0].strength, 'moderate');
   assert.equal(report.signals.moveQuality.observations[0].kind, 'critical-engine-agreement');
 });
+
+test('excludes unscored engine results from agreement sample size', () => {
+  const valid = engineResults(3, true);
+  const report = createEvidenceReport({
+    game: finishedGame,
+    engineAnalysis: {
+      status: 'complete',
+      results: [...valid, { centipawnLoss: null, bestMoveMatches: true }, { bestMoveMatches: true }]
+    }
+  });
+
+  assert.equal(report.signals.moveQuality.observations.length, 0);
+});
