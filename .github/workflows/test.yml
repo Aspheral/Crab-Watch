@@ -12,4 +12,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+      - run: npm ci
       - run: npm test
+      - run: npm run vendor:stockfish
+      - run: sudo apt-get update && sudo apt-get install -y imagemagick
+      - run: npm run validate:release
+      - run: npm run package:extension
+      - name: Verify release package
+        shell: bash
+        run: |
+          test -f "crab-watch-v0.11.0.zip"
+          unzip -l "crab-watch-v0.11.0.zip" | grep -q 'assets/icons/icon48.png'
+          unzip -l "crab-watch-v0.11.0.zip" | grep -q 'assets/icons/icon128.png'
+          unzip -l "crab-watch-v0.11.0.zip" | grep -q 'vendor/stockfish/stockfish-18-lite-single.js'
+          unzip -l "crab-watch-v0.11.0.zip" | grep -q 'vendor/stockfish/stockfish-18-lite-single.wasm'
