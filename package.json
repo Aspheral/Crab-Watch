@@ -6,7 +6,8 @@
   "scripts": {
     "test": "node --test",
     "vendor:stockfish": "npm install && node scripts/vendor-stockfish.mjs",
-    "package:extension": "node scripts/package-extension.mjs"
+    "validate:release": "node scripts/validate-release.mjs",
+    "package:extension": "npm run validate:release && node scripts/package-extension.mjs"
   },
   "dependencies": {
     "stockfish": "18.0.8"
