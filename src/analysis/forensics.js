@@ -38,7 +38,8 @@ function engineObservations(engineAnalysis) {
 
 function baselineObservations(engineBaseline) {
   const comparison = engineBaseline?.comparison;
-  if (!comparison || comparison.status !== 'complete') return [];
+  const summary = engineBaseline?.summary;
+  if (!comparison || comparison.status !== 'complete' || !summary || summary.gamesSampled < 4 || summary.positionsScored < 4) return [];
   const observations = [];
   if (comparison.baselineMedianCpl !== null && comparison.currentMedianCpl !== null && comparison.currentMedianCpl <= comparison.baselineMedianCpl * 0.45) {
     observations.push({ source: 'personal-baseline', strength: 'moderate', kind: 'historical-engine-improvement', text: `The selected critical decisions had a median engine loss of about ${Math.round(comparison.currentMedianCpl)} cp versus about ${Math.round(comparison.baselineMedianCpl)} cp in the sampled historical baseline.` });
