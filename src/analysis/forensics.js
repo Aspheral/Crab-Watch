@@ -27,6 +27,7 @@ function timingObservations(timing) {
 function engineObservations(engineAnalysis) {
   if (!engineAnalysis || engineAnalysis.status !== 'complete') return [];
   const results = Array.isArray(engineAnalysis.results) ? engineAnalysis.results : [];
+  const observations = [];
   const losses = results.map(item => item.centipawnLoss).filter(Number.isFinite);
   const matches = results.filter(item => item.bestMoveMatches).length;
   const meanLoss = losses.length ? losses.reduce((a, b) => a + b, 0) / losses.length : null;
