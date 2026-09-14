@@ -18,6 +18,13 @@ test('computes non-negative centipawn loss', () => {
   assert.equal(scoreLoss({ type: 'cp', value: 21 }, { type: 'cp', value: 82 }), 0);
 });
 
+test('preserves mate-distance loss instead of flattening all wins to one score', () => {
+  assert.equal(scoreLoss({ type: 'mate', value: 1 }, { type: 'mate', value: 7 }), 6);
+  assert.equal(scoreLoss({ type: 'mate', value: 5 }, { type: 'mate', value: 2 }), 0);
+  assert.equal(scoreLoss({ type: 'mate', value: 1 }, { type: 'mate', value: -3 }), 100002);
+  assert.equal(scoreLoss({ type: 'mate', value: -3 }, { type: 'mate', value: 2 }), 0);
+});
+
 test('does not count missing engine moves as a top-move match', () => {
   assert.equal(movesMatch(null, null), false);
   assert.equal(movesMatch('', 'e2e4'), false);
