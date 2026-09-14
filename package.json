@@ -1,11 +1,12 @@
 {
   "name": "crab-watch",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "vendor:stockfish": "npm install && node scripts/vendor-stockfish.mjs"
+    "vendor:stockfish": "npm install && node scripts/vendor-stockfish.mjs",
+    "package:extension": "node scripts/package-extension.mjs"
   },
   "dependencies": {
     "stockfish": "18.0.8"
