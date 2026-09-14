@@ -11,44 +11,44 @@ The goal is not to provide another engine-accuracy meter. Crab Watch examines a 
 - **History matters.** The opponent's recent public games form a baseline rather than treating every game in isolation.
 - **Human behavior matters.** Expected mistakes, position difficulty, time pressure, and player-specific patterns matter more than raw engine agreement alone.
 - **Quiet UI.** The interface uses clean cards, restrained typography, useful visual summaries, and no fake telemetry or sci-fi dashboard language.
-- **Account size is context, not immunity.** A large game history can be informative, but there is no arbitrary game-count cutoff that makes an account innocent.
+- **Account size is context, not immunity.** A 351+ game history is retained as account-context evidence, not used as an innocence cutoff.
 
-## Current state: 0.4.0
+## Current state: 0.4.1
 
 The extension now has a working post-game data path:
 
 1. Detect a completed Chess.com game.
 2. Capture visible game identity and move information without analyzing the position.
 3. Identify the opponent when the page exposes an unambiguous current-user identity.
-4. Collect the opponent's most recent **300 public games** through Chess.com's read-only PubAPI.
-5. Cache the history locally and reuse it for up to 12 hours.
-6. Match the completed game against the public archive when possible.
-7. Build an initial historical-behavior report covering rating context, game count, result profile, account span, and repeated early-game decisions.
-8. Store the evidence report for the next analysis layer.
+4. Collect up to **351 recent public games** through Chess.com's read-only PubAPI.
+5. Use the most recent **300 games** as the main behavioral-analysis window while retaining the extra account-context sample.
+6. Cache the history locally and reuse it for up to 12 hours.
+7. Match the completed game against the public archive when possible.
+8. Reconstruct standard chess positions from PGN and fingerprint exact positions.
+9. Look for recurring position-and-move decisions across the recent history.
+10. Build a descriptive historical-behavior report covering rating context, result profile, account span, repeated opening behavior, and exact repeated-position decisions.
+11. Store the evidence report for the next analysis layer.
 
 The current history layer is deliberately descriptive. It does **not** claim that repeated opening moves, long account histories, rating changes, or a single unusual game prove cheating.
 
 ## Planned analysis layers
 
 1. Completed-game ingestion and PGN validation
-2. Public account history collection and caching
-3. Full board reconstruction and position indexing
-4. Exact repeated-position detection
-5. Similar-position matching beyond exact FEN equality
-6. Position difficulty and critical-decision modeling
-7. Engine agreement and move-quality analysis after game completion
-8. Player-specific error signatures
-9. Historical strength modeling
-10. Change-point detection
-11. Move-time behavior analysis where reliable timing data exists
-12. Cross-game anomaly clustering
-13. Multi-engine / multi-depth agreement analysis
-14. Calibrated evidence fusion
-15. Human-readable review reports
+2. Similar-position matching beyond exact position equality
+3. Position difficulty and critical-decision modeling
+4. Engine agreement and move-quality analysis after game completion
+5. Player-specific error signatures
+6. Historical strength modeling
+7. Change-point detection
+8. Move-time behavior analysis where reliable timing data exists
+9. Cross-game anomaly clustering
+10. Multi-engine / multi-depth agreement analysis
+11. Calibrated evidence fusion
+12. Human-readable review reports
 
 ## API behavior
 
-The public Chess.com API is read-only. Crab Watch uses serial archive requests rather than parallel bursts and caches the resulting history locally. The project does not send moves or other commands to Chess.com.
+The public Chess.com API is read-only. Crab Watch uses serial archive requests rather than parallel bursts and caches the resulting history locally. Chess.com documents that its public API responses may be cached for up to 12 hours and that parallel request bursts can trigger rate limiting, so the collector deliberately follows that model. citeturn0search0
 
 ## Important limitation
 
