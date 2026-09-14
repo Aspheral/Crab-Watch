@@ -1,12 +1,9 @@
 /**
- * Crab Watch forensic pipeline contract.
+ * Evidence fusion contract.
  *
- * This module intentionally does not run inside the live Chess.com page.
- * It accepts completed-game data only.
- *
- * The first implementation is a framework, not a cheating detector. Numeric
- * weights should not be presented as calibrated probabilities until they have
- * been validated against a labeled corpus of clean and confirmed-cheating games.
+ * This module is intentionally post-game only. It does not contain an engine
+ * and does not produce a calibrated probability. Those require validation
+ * against a labeled corpus of clean and confirmed-cheating games.
  */
 
 export const SIGNALS = Object.freeze([
@@ -22,39 +19,78 @@ export const SIGNALS = Object.freeze([
   'accountHistory'
 ]);
 
-export function createEvidenceReport({ game, history = [], player = null }) {
-  if (!game?.finished) {
-    throw new Error('Crab Watch only accepts completed games.');
-  }
+const LEVELS = Object.freeze({
+  none: 0,
+  low: 1,
+  moderate: 2,
+  high: 3
+});
+
+function evidenceFromHistory(observations = []) {
+  return observations.map(observation => ({
+    source: 'history',
+    strength: observation.strength,
+    kind: observation.kind,
+    text: observation.text
+  }));
+}
+
+export function createEvidenceReport({ game, history = [], player = null, historyAnalysis = null }) {
+  if (!game?.finished) throw new Error('Crab Watch only accepts completed games.');
+
+  const signals = SIGNALS.reduce((out, key) => {
+    out[key] = { status: 'not-run', observations: [] };
+    return out;
+  }, {});
+
+  signals.accountHistory = {
+    status: 'complete',
+    observations: evidenceFromHistory(historyAnalysis?.observations || [])
+  };
+
+  signals.historicalStrength = {
+    status: historyAnalysis?.stats ? 'complete' : 'not-run',
+    observations: historyAnalysis?.stats?.ratingDelta !== null && historyAnalysis?.stats?.ratingDelta !== undefined
+      ? [{
+          source: 'history',
+          strength: 'context',
+          kind: 'rating-span',
+          text: `The sampled history spans ${Math.round(Math.abs(historyAnalysis.stats.ratingDelta))} rating points.`
+        }]
+      : []
+  };
 
   return {
-    version: 1,
+    version: 2,
     player,
-    sample: {
-      currentGame: game,
-      historyGames: history.length
-    },
-    signals: SIGNALS.reduce((out, key) => {
-      out[key] = { status: 'not-run', observations: [] };
-      return out;
-    }, {}),
-    assessment: {
-      level: 'insufficient-evidence',
-      confidence: 'low',
-      calibratedProbability: null
-    }
+    sample: { currentGame: game, historyGames: history.length },
+    signals,
+    assessment: classifyAssessment({ signals })
   };
 }
 
 export function classifyAssessment(report) {
-  const observations = Object.values(report.signals)
-    .flatMap(signal => signal.observations || []);
+  const observations = Object.values(report.signals).flatMap(signal => signal.observations || []);
+  const scored = observations.map(item => LEVELS[item.strength] ?? 0);
+  const strongest = scored.length ? Math.max(...scored) : 0;
+  const independentKinds = new Set(observations.map(item => item.kind).filter(Boolean));
 
   if (!observations.length) {
-    return { level: 'insufficient-evidence', confidence: 'low' };
+    return { level: 'insufficient-evidence', confidence: 'low', calibratedProbability: null };
   }
 
-  // Placeholder only. Real evidence fusion will be implemented after the
-  // individual signal modules and validation corpus exist.
-  return { level: 'review-required', confidence: 'low' };
+  // This is deliberately a descriptive state, not a cheating probability.
+  // Context-only observations never elevate the assessment.
+  const hasActionable = observations.some(item => LEVELS[item.strength] >= LEVELS.moderate);
+  const level = hasActionable && strongest >= LEVELS.high
+    ? 'elevated-anomaly'
+    : hasActionable && independentKinds.size >= 2
+      ? 'review-required'
+      : 'context-only';
+
+  return {
+    level,
+    confidence: independentKinds.size >= 2 ? 'moderate' : 'low',
+    calibratedProbability: null
+  };
 }
