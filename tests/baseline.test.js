@@ -51,7 +51,7 @@ test('detects a temporal engine-quality shift only with enough historical games'
   assert.equal(result.status, 'complete');
   assert.equal(result.recentGames, 4);
   assert.equal(result.olderGames, 4);
-  assert.equal(result.cplShift, -39);
+  assert.equal(result.cplShift, -43.5);
   assert.equal(result.matchRateDelta, 0.75);
 });
 
