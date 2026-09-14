@@ -27,7 +27,6 @@ function timingObservations(timing) {
 function engineObservations(engineAnalysis) {
   if (!engineAnalysis || engineAnalysis.status !== 'complete') return [];
   const results = Array.isArray(engineAnalysis.results) ? engineAnalysis.results : [];
-  const observations = [];
   const losses = results.map(item => item.centipawnLoss).filter(Number.isFinite);
   const matches = results.filter(item => item.bestMoveMatches).length;
   const meanLoss = losses.length ? losses.reduce((a, b) => a + b, 0) / losses.length : null;
@@ -53,6 +52,7 @@ function changePointObservations(changePointAnalysis) {
   if (candidate.ratingShift !== null && Math.abs(candidate.ratingShift) >= 200) observations.push({ source: 'change-point', strength: 'moderate', kind: 'sustained-rating-shift', text: `The recent account segment is about ${Math.round(Math.abs(candidate.ratingShift))} rating points ${candidate.ratingShift >= 0 ? 'higher' : 'lower'} than the older segment.` });
   if (candidate.resultShift !== null && Math.abs(candidate.resultShift) >= 0.25) observations.push({ source: 'change-point', strength: 'low', kind: 'sustained-result-shift', text: `The recent segment's score rate changed by about ${Math.round(Math.abs(candidate.resultShift) * 100)} percentage points.` });
   if (candidate.moveShift !== null && Math.abs(candidate.moveShift) >= 12) observations.push({ source: 'change-point', strength: 'low', kind: 'sustained-game-length-shift', text: `The recent segment's average game length changed by about ${Math.round(Math.abs(candidate.moveShift))} plies.` });
+  if (candidate.timingShift !== null && Math.abs(candidate.timingShift) >= 0.2 && candidate.timedGamesRecent >= 5 && candidate.timedGamesOlder >= 5) observations.push({ source: 'change-point', strength: 'low', kind: 'sustained-timing-shift', text: `The recent segment's very-fast move share changed by about ${Math.round(Math.abs(candidate.timingShift) * 100)} percentage points across games with sufficient clock data.` });
   return observations;
 }
 
