@@ -6,6 +6,11 @@ const gameMeta = document.querySelector('#gameMeta');
 const review = document.querySelector('#review');
 const historyCount = document.querySelector('#historyCount');
 const historyBars = document.querySelector('#historyBars');
+const assessment = document.querySelector('#assessment');
+const assessmentDot = document.querySelector('#assessmentDot');
+const assessmentTitle = document.querySelector('#assessmentTitle');
+const assessmentText = document.querySelector('#assessmentText');
+const signals = document.querySelector('#signals');
 const error = document.querySelector('#error');
 
 function showError(message) {
@@ -23,6 +28,50 @@ function renderHistoryShape(count) {
     bar.style.height = `${8 + ((i * 17) % 15)}px`;
     historyBars.appendChild(bar);
   }
+}
+
+function renderEvidence(evidence) {
+  if (!evidence) return;
+  assessment.hidden = false;
+  const level = evidence.assessment?.level;
+  if (level === 'elevated-anomaly') {
+    assessmentTitle.textContent = 'Unusual patterns';
+    assessmentText.textContent = 'Several independent signals deserve a closer look. This is not a cheating verdict.';
+    assessmentDot.dataset.state = 'high';
+  } else if (level === 'review-required') {
+    assessmentTitle.textContent = 'Some unusual patterns';
+    assessmentText.textContent = 'The history contains more than one point worth examining.';
+    assessmentDot.dataset.state = 'medium';
+  } else {
+    assessmentTitle.textContent = 'History in context';
+    assessmentText.textContent = 'The first pass found context, but not enough evidence for a strong conclusion.';
+    assessmentDot.dataset.state = 'low';
+  }
+
+  signals.replaceChildren();
+  const rows = [
+    ['History', evidence.signals.accountHistory],
+    ['Strength', evidence.signals.historicalStrength],
+    ['Repeated play', evidence.signals.repeatedDecision]
+  ];
+  for (const [label, signal] of rows) {
+    const row = document.createElement('div');
+    row.className = 'signal-row';
+    const left = document.createElement('span');
+    left.textContent = label;
+    const right = document.createElement('span');
+    right.textContent = signal?.observations?.length ? 'context found' : 'no finding';
+    row.append(left, right);
+    signals.appendChild(row);
+  }
+}
+
+async function renderStoredReview(review) {
+  if (!review) return;
+  historyCount.textContent = review.historyCount || 0;
+  renderHistoryShape(review.historyCount || 0);
+  result.textContent = review.evidence?.assessment?.level === 'context-only' ? 'In context' : 'Reviewed';
+  renderEvidence(review.evidence);
 }
 
 async function load() {
@@ -43,9 +92,7 @@ async function load() {
   gameMeta.textContent = game.gameId ? `Game ${game.gameId}` : 'Finished';
 
   if (previous?.opponent && previous.opponent.toLowerCase() === opponentName?.toLowerCase()) {
-    historyCount.textContent = previous.historyCount || 0;
-    renderHistoryShape(previous.historyCount || 0);
-    result.textContent = 'Ready';
+    await renderStoredReview(previous);
   } else {
     historyCount.textContent = '—';
     renderHistoryShape(0);
@@ -66,11 +113,9 @@ review.addEventListener('click', async () => {
     return;
   }
 
-  historyCount.textContent = response.review.historyCount;
-  renderHistoryShape(response.review.historyCount);
-  result.textContent = 'History ready';
+  await renderStoredReview(response.review);
   gameMeta.textContent = `${response.review.historyCount} games collected`;
-  review.textContent = 'Analysis next';
+  review.textContent = 'History reviewed';
 });
 
 document.querySelector('#settings').addEventListener('click', () => {
