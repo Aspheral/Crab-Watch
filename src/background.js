@@ -1,11 +1,12 @@
 import { getRecentGames, validUsername, HISTORY_WINDOW, ACCOUNT_CONTEXT_WINDOW } from './chesscom-api.js';
 import { compareCurrentGameToHistory } from './analysis/history.js';
+import { detectCriticalPositions } from './analysis/critical.js';
 import { createEvidenceReport } from './analysis/forensics.js';
 
 const GAME_STATE_KEY = 'crabWatchGameState';
 const REVIEW_KEY = 'crabWatchReview';
 const CACHE_KEY_PREFIX = 'crabWatchHistory:';
-const VERSION = '0.4.1';
+const VERSION = '0.5.0';
 
 async function setCrabIcon() {
   try {
@@ -30,6 +31,14 @@ function opponentFor(game) {
   const current = game.currentUser?.toLowerCase();
   if (!current) return null;
   return game.players.find(name => name.toLowerCase() !== current) || null;
+}
+
+function colorForPlayer(game, username) {
+  const lower = username?.toLowerCase();
+  if (!lower) return null;
+  if (game?.white?.username?.toLowerCase() === lower) return 'w';
+  if (game?.black?.username?.toLowerCase() === lower) return 'b';
+  return null;
 }
 
 async function cachedHistory(username) {
@@ -71,7 +80,17 @@ async function requestReview(sendResponse) {
   const games = history.games || [];
   const currentGame = findCurrentGame(games, state) || state;
   const historyAnalysis = compareCurrentGameToHistory(opponent, currentGame, games);
-  const evidence = createEvidenceReport({ game: { ...currentGame, finished: true }, history: games.slice(0, HISTORY_WINDOW), player: opponent, historyAnalysis });
+  const opponentColor = colorForPlayer(currentGame, opponent);
+  const criticalAnalysis = currentGame?.pgn
+    ? await detectCriticalPositions(currentGame.pgn, opponentColor, 12)
+    : null;
+  const evidence = createEvidenceReport({
+    game: { ...currentGame, finished: true },
+    history: games.slice(0, HISTORY_WINDOW),
+    player: opponent,
+    historyAnalysis,
+    criticalAnalysis
+  });
 
   const review = {
     version: VERSION,
@@ -84,8 +103,9 @@ async function requestReview(sendResponse) {
     historyFetchedAt: history.fetchedAt,
     fromCache: history.fromCache,
     historyAnalysis,
+    criticalAnalysis,
     evidence,
-    analysis: { engine: 'not-run', status: 'history-context-ready' },
+    analysis: { engine: 'not-run', status: criticalAnalysis ? 'critical-positions-ready' : 'history-context-ready' },
     readyForAnalysisAt: Date.now()
   };
 
