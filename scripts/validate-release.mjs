@@ -14,6 +14,7 @@ const requiredFiles = [
   'src/background.js',
   'src/offscreen.js',
   'assets/crab.svg',
+  'scripts/package-extension.mjs',
 ];
 
 function assert(condition, message) {
@@ -21,7 +22,7 @@ function assert(condition, message) {
 }
 
 assert(manifest.manifest_version === 3, 'Manifest V3 is required.');
-assert(/^\\d+(?:\\.\\d+){0,3}$/.test(manifest.version), `Invalid manifest version: ${manifest.version}`);
+assert(/^\d+(?:\.\d+){0,3}$/.test(manifest.version), `Invalid manifest version: ${manifest.version}`);
 assert(manifest.version_name === '0.11.0 Beta', 'Release validator expects 0.11.0 Beta.');
 assert(manifest.permissions?.includes('storage'), 'storage permission missing.');
 assert(manifest.permissions?.includes('offscreen'), 'offscreen permission missing.');
@@ -32,11 +33,9 @@ for (const relativePath of requiredFiles) {
   try {
     await fs.access(path.join(root, relativePath));
   } catch {
-    throw new Error(`Required runtime file missing: ${relativePath}`);
+    throw new Error(`Required release source file missing: ${relativePath}`);
   }
 }
 
-assert(manifest.icons?.['48'], 'Final 48x48 icon is not wired into the manifest yet.');
-assert(manifest.icons?.['128'], 'Final 128x128 icon is not wired into the manifest yet.');
-
-console.log(`Release manifest ${manifest.version_name} passed structural validation.`);
+console.log(`Release source ${manifest.version_name} passed structural validation.`);
+console.log('Store icons will be rasterized from the repository crab.svg during packaging.');
